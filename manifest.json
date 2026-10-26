@@ -1,22 +1,13 @@
 {
-  "name":"مصحفي",
-  "short_name": "مصحفي",
-  "description": "تطبيق القرآن",
-  "start_url": "./index.html",
+  "background_color": "#ffffff",
+  "dir": "ltr",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#1a1a1a",
-  "theme_color": "#5c3317",
-  "icons": [
-    {
-      "src": "icon.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "name": "Mushafi Quran",
+  "short_name": "Mushafi",
+  "orientation": "any",
+  "scope": "/",
+  "start_url": "/",
+  "theme_color": "#ffffff",
+  "id": "https://www.laithissa.online/",
+  "description": "Read the Holy Quran online with Mushafi. If you notice any mistake or something not working, please email us at YOUR_EMAIL_HERE. اقرأ القرآن الكريم عبر الإنترنت مع مصحفي. وإذا لاحظت أي خطأ أو شيئًا لا يعمل، يُرجى مراسلتنا عبر البريد الإلكتروني YOUR_EMAIL_HERE"
 }

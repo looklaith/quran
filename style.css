@@ -1,7 +1,6 @@
-@media (max-width: 600px) {
-  .toolbar { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; padding: 8px 10px; }
-  .toolbar > div { flex-shrink: 0; }
-  .toolbar select { max-width: 110px; font-size: 0.75rem; }
-  .toolbar label { font-size: 0.75rem; white-space: nowrap; }
-  .mode-btn { padding: 4px 7px; font-size: 0.72rem; }
-}
+#ask{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
+#ask .line{display:flex;gap:6px}
+#ask input{flex:1;min-width:0}
+#ans{margin-top:10px;line-height:1.9;white-space:pre-wrap}
+#ans.err{color:#b3201f}
+#ask small.note{display:block;margin-top:8px;opacity:.7;color:inherit}
