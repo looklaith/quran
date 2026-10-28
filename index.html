@@ -153,6 +153,8 @@ const store = {
   get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }
 };
+// Number shown on screen: in Al-Fatihah the Bismillah is an unnumbered heading, so verses shift down by one.
+const shownNo = a => a.surah.number === 1 ? a.numberInSurah - 1 : a.numberInSurah;
 const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 
 // One request per page+edition, cached, so going back and forth is instant.
@@ -208,20 +210,31 @@ async function loadPage(p, opts = {}) {
     const first = a.numberInSurah === 1;
     // Plain text, or the tajweed-tagged text for this same ayah when the switch is on.
     let t = (tj && tj[n + ':' + a.numberInSurah]) || a.text;
+    // Al-Fatihah: ayah 1 IS the Bismillah. Show it only as the (unnumbered) heading.
+    // It keeps data-i so audio, highlighting and tap still work; numbering below shifts by one.
+    if (n === 1 && a.numberInSurah === 1) {
+      h += `<span class="sura">${a.surah.name}</span>`;
+      h += `<span class="bism ayah" data-i="${i}">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</span>`;
+      return;
+    }
     if (first) {
       h += `<span class="sura">${a.surah.name}</span>`;
-      // The API puts the Bismillah inside ayah 1 of every surah except Al-Fatihah (where it IS ayah 1)
-      // and At-Tawbah (none). Cut it out and show it once as a heading.
-      if (n !== 1 && n !== 9) {
+      // The Bismillah is ALWAYS shown as a heading, in the same place for every surah
+      // (including Al-Fatihah), except At-Tawbah (surah 9) which has none.
+      if (n !== 9) h += `<span class="bism">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</span>`;
+      // Remove the Bismillah from the start of ayah 1 so it is not shown twice.
+      // Works for plain text and for tajweed text (words may be wrapped in tags).
+      if (n !== 9) {
         const words = t.split(/ (?![^<]*>)/);          // split on spaces that are not inside a tag
-        const plain = words[0].replace(/<[^>]*>/g, '').replace(/[\u064B-\u065F\u0670\u0640]/g, '');
-        if (plain.replace(/\u0671/g, 'ا') === 'بسم' || plain === 'بسم') {
-          h += `<span class="bism">${words.slice(0, 4).join(' ')}</span>`;
+        const clean = w => w.replace(/<[^>]*>/g, '')
+          .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '')
+          .replace(/[\u0671\u0622\u0623\u0625]/g, '\u0627');
+        if (words.length > 4 && clean(words[0]) === '\u0628\u0633\u0645' && clean(words[1]) === '\u0627\u0644\u0644\u0647') {
           t = words.slice(4).join(' ');
         }
       }
     }
-    h += `<span class="ayah" data-i="${i}">${t}<span class="num">﴿${ar(a.numberInSurah)}﴾</span></span> `;
+    h += `<span class="ayah" data-i="${i}">${t}<span class="num">﴿${ar(shownNo(a))}﴾</span></span> `;
   });
   const box = $('text');
   box.className = '';
@@ -255,7 +268,7 @@ function selectAyah(i) {
   document.querySelectorAll('.ayah.sel').forEach(e => e.classList.remove('sel'));
   document.querySelector(`.ayah[data-i="${i}"]`).classList.add('sel');
   const a = S.ayahs[i];
-  $('ref').textContent = `${a.surah.name} ﴿${ar(a.numberInSurah)}﴾`;
+  $('ref').textContent = a.surah.number === 1 && a.numberInSurah === 1 ? `${a.surah.name} · البسملة` : `${a.surah.name} ﴿${ar(shownNo(a))}﴾`;
   $('sheet').classList.add('open');
   fill(i);
 }
