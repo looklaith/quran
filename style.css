@@ -1,6 +1,0 @@
-#ask{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
-#ask .line{display:flex;gap:6px}
-#ask input{flex:1;min-width:0}
-#ans{margin-top:10px;line-height:1.9;white-space:pre-wrap}
-#ans.err{color:#b3201f}
-#ask small.note{display:block;margin-top:8px;opacity:.7;color:inherit}

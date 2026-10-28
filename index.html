@@ -6,6 +6,7 @@
 <title>مصحفي</title>
 <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
 <style>
+  
 :root{--bg:#f5f0e8;--text:#2c1a0e;--accent:#4f7f5a;--panel:#ebe2cc;--border:#c9b99a;--fs:1.9rem}
 body.dark{--bg:#1a1a2e;--text:#e8d9c0;--accent:#6aaa7a;--panel:#16213e;--border:#334466}
 body.night{--bg:#0d0d0d;--text:#c8a96e;--accent:#c8a96e;--panel:#161208;--border:#3a2e00}
@@ -74,6 +75,13 @@ body.night.tj #text tajweed.qalaqah{color:#7fb0ff}
 #legend{display:none;margin-top:10px;font-size:.9rem;line-height:2}
 body.tj #legend.show{display:block}
 #legend i{display:inline-block;width:.9em;height:.9em;border-radius:50%;vertical-align:middle;margin-inline:4px 4px}
+#ask{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
+#ask .line{display:flex;gap:6px}
+#ask input{flex:1;min-width:0}
+#ans{margin-top:10px;line-height:1.9;white-space:pre-wrap}
+#ans.err{color:#b3201f}
+#ask small.note{display:block;margin-top:8px;opacity:.7;color:inherit}
+#ab:disabled{opacity:.5;cursor:wait}
 </style>
 <link rel="manifest" href="/manifest.json">
 </head>
@@ -107,6 +115,15 @@ body.tj #legend.show{display:block}
   <div id="tr"></div>
   <small>التفسير الميسر</small>
   <div id="tf"></div>
+  <div id="ask">
+    <small>اسأل عن هذه الآية</small>
+    <div class="line">
+      <input id="aq" maxlength="300" placeholder="اكتب سؤالك عن هذه الآية...">
+      <button id="ab">اسأل</button>
+    </div>
+    <div id="ans"></div>
+    <small class="note">إجابة آلية مبنية على تفسير الميسر فقط، وقد تخطئ. للفتاوى راجع أهل العلم.</small>
+  </div>
 </section>
 
 <aside id="drawer">
@@ -270,6 +287,7 @@ function selectAyah(i) {
   const a = S.ayahs[i];
   $('ref').textContent = a.surah.number === 1 && a.numberInSurah === 1 ? `${a.surah.name} · البسملة` : `${a.surah.name} ﴿${ar(shownNo(a))}﴾`;
   $('sheet').classList.add('open');
+  $('ans').textContent = ''; $('aq').value = '';
   fill(i);
 }
 function closeSheet() {
@@ -420,6 +438,32 @@ if (store.get('rec')) $('rec').value = store.get('rec');
 if (!$('rec').value) $('rec').selectedIndex = 0;
 setTajweed(store.get('tj') === '1');
 loadPage(parseInt(store.get('lastPage')) || 1, { noAnim: true });
+
+// ---------- Ask AI about the selected ayah ----------
+async function askAI() {
+  const i = S.sel; if (i < 0) return;
+  const q = $('aq').value.trim(); if (!q) return;
+  const a = S.ayahs[i];
+  $('ab').disabled = true; $('ans').className = ''; $('ans').textContent = '…';
+  try {
+    const r = await fetch('/api/ask', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, surah: a.surah.number, ayah: a.numberInSurah })
+    });
+    const d = await r.json();
+    if (S.sel !== i) return;
+    if (!r.ok) { $('ans').className = 'err'; $('ans').textContent = d.error || 'حدث خطأ.'; }
+    else $('ans').textContent = d.answer;
+  } catch (e) { $('ans').className = 'err'; $('ans').textContent = 'تعذّر الاتصال. تحقق من الإنترنت.'; }
+  $('ab').disabled = false;
+}
+$('ab').onclick = askAI;
+$('aq').addEventListener('keydown', e => { if (e.key === 'Enter') askAI(); });
+
+// ---------- Offline / install ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+}
 </script>
 </body>
 </html>
