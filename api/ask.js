@@ -1,5 +1,5 @@
 // api/ask.js  (runs on Vercel, the key never reaches the browser)
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-flash-lite-latest';
 const MAX_QUESTION = 300;
 const LIMIT = 10;            // questions per visitor per hour
 const GLOBAL_LIMIT = 300;    // questions per hour for the whole site (protects your free Gemini quota)
