@@ -87,7 +87,7 @@ module.exports = async (req, res) => {
       }
     );
     const data = await r.json();
-    if (!r.ok) {
+    if (!r.ok) {console.error('Gemini error', r.status, JSON.stringify(data));
       const busy = r.status === 429;
       return res.status(busy ? 429 : 502).json({
         error: busy ? 'The free daily limit is reached. Please try again later.' : 'The AI service had a problem. Please try again.'
