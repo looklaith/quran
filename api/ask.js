@@ -2,7 +2,7 @@
 // One endpoint for both the typed question box and the  assistant.
 // The AI can ONLY answer about the selected ayah/tafsir, or pick one action from a fixed list.
 // Every action it returns is validated here, so nothing outside this list can ever reach the page.
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-flash-lite-latest';
 const MAX_QUESTION = 300;
 const LIMIT = 15;            // requests per visitor per hour (best effort on serverless)
 const GLOBAL_LIMIT = 400;    // requests per hour for the whole site (protects your free Gemini quota)
