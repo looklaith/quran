@@ -15,9 +15,26 @@ const THEMES = ['light', 'dark', 'night'];
 const ACTIONS = ['answer', 'goto_surah', 'goto_page', 'next_page', 'prev_page', 'tajweed', 'reciter',
   'translation', 'theme', 'font', 'play', 'stop'];
 
+// Shared rate limit in Upstash Redis (free tier, added from the Vercel dashboard: Storage -> Upstash).
+// Every server copy counts in the same place, so the limits really hold.
+// If Redis is not set up yet, it falls back to the old in-memory counter (weaker, per server copy).
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+
+async function redisCount(key) {
+  const r = await fetch(REDIS_URL + '/pipeline', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + REDIS_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify([['INCR', key], ['EXPIRE', key, 3600, 'NX']]),
+    signal: AbortSignal.timeout(3000)
+  });
+  const d = await r.json();
+  return Number(d[0].result);
+}
+
 const hits = new Map();
 let globalHits = [];
-function limited(ip) {
+function memoryLimited(ip) {
   const now = Date.now();
   globalHits = globalHits.filter(t => now - t < 3600000);
   if (globalHits.length >= GLOBAL_LIMIT) return true;
@@ -25,12 +42,24 @@ function limited(ip) {
   if (list.length >= LIMIT) return true;
   list.push(now); globalHits.push(now);
   hits.set(ip, list);
-  if (hits.size > 5000) hits.clear();
+  if (hits.size > 5000) hits.delete(hits.keys().next().value);   // drop the oldest visitor, not everyone
   return false;
 }
 
+async function limited(ip) {
+  if (!REDIS_URL || !REDIS_TOKEN) return memoryLimited(ip);
+  const hour = Math.floor(Date.now() / 3600000);
+  try {
+    const [mine, all] = await Promise.all([redisCount(`rl:${hour}:${ip}`), redisCount(`rl:${hour}:all`)]);
+    return mine > LIMIT || all > GLOBAL_LIMIT;
+  } catch (e) {
+    console.error('rate limit store failed', e);
+    return memoryLimited(ip);
+  }
+}
+
 async function getJson(url) {
-  const r = await fetch(url);
+  const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
   const d = await r.json();
   if (d.status !== 'OK') throw new Error('bad');
   return d.data;
@@ -72,15 +101,18 @@ module.exports = async (req, res) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
+  // Browsers always send Origin on a POST like ours, so a missing Origin means a script, not the app.
+  // (A determined attacker can fake this header; the rate limit below is the real protection.)
   const origin = req.headers.origin || '';
-  const okOrigin = !origin || /^https:\/\/([a-z0-9-]+\.)?laithissa\.online$/.test(origin) || /^https:\/\/quran-rust-chi\.vercel\.app$/.test(origin);
+  const okOrigin = /^https:\/\/([a-z0-9-]+\.)?laithissa\.online$/.test(origin) || /^https:\/\/quran-rust-chi\.vercel\.app$/.test(origin);
   if (!okOrigin) return res.status(403).json({ error: 'Not allowed.' });
 
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(500).json({ error: 'Server key is not set.' });
 
-  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-  if (limited(ip)) return res.status(429).json({ error: 'Too many questions. Please try again later.' });
+  // x-real-ip is set by Vercel itself and cannot be faked by the visitor.
+  const ip = String(req.headers['x-real-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0]).trim() || 'unknown';
+  if (await limited(ip)) return res.status(429).json({ error: 'Too many questions. Please try again later.' });
 
   let body = {};
   try { body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (e) {}
@@ -145,11 +177,13 @@ module.exports = async (req, res) => {
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.2, maxOutputTokens: 600, responseMimeType: 'application/json' }
-        })
+        }),
+        signal: AbortSignal.timeout(9000)
       }
     );
     const data = await r.json();
     if (!r.ok) {
+      console.error('Gemini error', r.status, JSON.stringify(data).slice(0, 300));
       const busy = r.status === 429;
       return res.status(busy ? 429 : 502).json({
         error: busy ? 'The free daily limit is reached. Please try again later.' : 'The AI service had a problem. Please try again.'
@@ -165,6 +199,7 @@ module.exports = async (req, res) => {
     if (!cmd.answer && cmd.action === 'answer') cmd.answer = 'لا توجد إجابة. أعد صياغة السؤال.';
     res.status(200).json(cmd);
   } catch (e) {
+    console.error('Gemini request failed', e);
     res.status(502).json({ error: 'Could not reach the AI service.' });
   }
 };
