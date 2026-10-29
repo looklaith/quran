@@ -45,6 +45,7 @@ body.menu #top,body.menu #bot{transform:none}
 #list li{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer}
 #list li:hover{background:var(--bg)}
 #list li span:first-child{color:var(--accent);min-width:28px}
+#drawer .priv{padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--border);color:var(--accent);font-size:.9rem;text-align:center}
 
 /* ---- page flip ---- */
 #text{transition:opacity .2s}
@@ -173,6 +174,7 @@ body.tj #legend.show{display:block}
     <input id="q" placeholder="ابحث عن سورة...">
   </div>
   <ul id="list"></ul>
+  <a class="priv" href="/privacy.html">سياسة الخصوصية · Privacy</a>
 </aside>
 
 <script src="/app.js" defer></script>
