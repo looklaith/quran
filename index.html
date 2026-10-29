@@ -6,6 +6,7 @@
 <title>مصحفي</title>
 <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
 <style>
+  
 :root{--bg:#f5f0e8;--text:#2c1a0e;--accent:#4f7f5a;--panel:#ebe2cc;--border:#c9b99a;--fs:1.9rem}
 body.dark{--bg:#1a1a2e;--text:#e8d9c0;--accent:#6aaa7a;--panel:#16213e;--border:#334466}
 body.night{--bg:#0d0d0d;--text:#c8a96e;--accent:#c8a96e;--panel:#161208;--border:#3a2e00}
@@ -81,8 +82,19 @@ body.tj #legend.show{display:block}
 #ans.err{color:#b3201f}
 #ask small.note{display:block;margin-top:8px;opacity:.7;color:inherit}
 #ab:disabled{opacity:.5;cursor:wait}
+.mic.on{background:var(--accent);color:var(--bg);border-color:var(--accent);animation:micPulse 1.1s ease-in-out infinite}
+@keyframes micPulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 30%,transparent)}}
+@media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
+#vp{position:fixed;top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;margin:auto;max-width:560px;z-index:50;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px 12px 44px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+#vp.show{display:block}
+#vp .x{position:absolute;z-index:1;top:8px;left:8px;padding:2px 9px}
+#vp .you{opacity:.7;font-size:.95rem;min-height:1.2em}
+#vp .bot{margin-top:6px;line-height:1.9;white-space:pre-wrap}
+#vp.err .bot{color:#b3201f}
 </style>
 <link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 </head>
 <body class="light">
 
@@ -104,12 +116,13 @@ body.tj #legend.show{display:block}
   </span>
   <span class="grp">
     <button id="play" title="تشغيل">▶</button><button id="stop" title="إيقاف">■</button>
+    <button class="mic" id="micBar" title="تحدث">🎤</button><button id="vl" title="لغة الصوت">ع</button>
   </span>
 </footer>
 
 <section id="sheet">
   <div class="row"><b id="ref"></b>
-    <span class="grp"><button id="sp">▶ استمع من هنا</button><button id="sx">✕</button></span>
+    <span class="grp"><button class="mic" id="micSheet" title="تحدث">🎤</button><button id="sp">▶ استمع من هنا</button><button id="sx">✕</button></span>
   </div>
   <div id="tr"></div>
   <small>التفسير الميسر</small>
@@ -124,6 +137,8 @@ body.tj #legend.show{display:block}
     <small class="note">إجابة آلية مبنية على تفسير الميسر فقط، وقد تخطئ. للفتاوى راجع أهل العلم.</small>
   </div>
 </section>
+
+<div id="vp" role="status" aria-live="polite"><button class="x" id="vx" title="إغلاق">✕</button><div class="you" id="vyou"></div><div class="bot" id="vbot"></div></div>
 
 <aside id="drawer">
   <div class="set">
@@ -438,26 +453,111 @@ if (!$('rec').value) $('rec').selectedIndex = 0;
 setTajweed(store.get('tj') === '1');
 loadPage(parseInt(store.get('lastPage')) || 1, { noAnim: true });
 
-// ---------- Ask AI about the selected ayah ----------
+// ---------- Ask the assistant (typed box + voice share one endpoint) ----------
+async function askServer(q, useAyah) {
+  const body = { question: q, state: { page: S.page, surah: S.ayahs[0] ? S.ayahs[0].surah.number : null } };
+  if (useAyah && S.sel >= 0) { const a = S.ayahs[S.sel]; body.surah = a.surah.number; body.ayah = a.numberInSurah; }
+  let r, d;
+  try {
+    r = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    d = await r.json();
+  } catch (e) { throw new Error('تعذّر الاتصال. تحقق من الإنترنت.'); }
+  if (!r.ok) throw new Error(d.error || 'حدث خطأ.');
+  return d;
+}
+
+// The server only ever sends an action from a fixed, validated list. Anything else is ignored here too.
+async function runAction(d) {
+  const say = d.answer || '';
+  switch (d.action) {
+    case 'goto_surah': {
+      const x = await (await fetch(API + 'ayah/' + d.value + ':1')).json();
+      await loadPage(x.data.page); break;
+    }
+    case 'goto_page': await loadPage(d.value); break;
+    case 'next_page': await go(1); break;
+    case 'prev_page': await go(-1); break;
+    case 'tajweed': setTajweed(!!d.value); await loadPage(S.page, { noAnim: true }); break;
+    case 'reciter': $('rec').value = d.value; store.set('rec', d.value); break;
+    case 'translation': $('trSel').value = d.value; store.set('tr', d.value); if (S.sel >= 0) fill(S.sel); break;
+    case 'theme': setTheme(d.value); break;
+    case 'font': setFont(fs + (d.value === 'up' ? 0.2 : -0.2)); break;
+    case 'play': if (S.audio && S.audio.paused) togglePlay(); else if (!S.audio) playFrom(S.sel >= 0 ? S.sel : 0); break;
+    case 'stop': stopAudio(); break;
+    default: break;            // "answer": nothing to do on the page
+  }
+  return say || 'تم.';
+}
+
 async function askAI() {
   const i = S.sel; if (i < 0) return;
   const q = $('aq').value.trim(); if (!q) return;
-  const a = S.ayahs[i];
   $('ab').disabled = true; $('ans').className = ''; $('ans').textContent = '…';
   try {
-    const r = await fetch('/api/ask', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, surah: a.surah.number, ayah: a.numberInSurah })
-    });
-    const d = await r.json();
-    if (S.sel !== i) return;
-    if (!r.ok) { $('ans').className = 'err'; $('ans').textContent = d.error || 'حدث خطأ.'; }
-    else $('ans').textContent = d.answer;
-  } catch (e) { $('ans').className = 'err'; $('ans').textContent = 'تعذّر الاتصال. تحقق من الإنترنت.'; }
+    const d = await askServer(q, true);
+    const msg = await runAction(d);
+    if (S.sel === i) $('ans').textContent = msg;
+  } catch (e) {
+    if (S.sel === i) { $('ans').className = 'err'; $('ans').textContent = e.message || 'حدث خطأ.'; }
+  }
   $('ab').disabled = false;
 }
 $('ab').onclick = askAI;
 $('aq').addEventListener('keydown', e => { if (e.key === 'Enter') askAI(); });
+
+// ---------- Voice assistant ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let vlang = store.get('vlang') === 'en-US' ? 'en-US' : 'ar-SA';
+let recog = null, listening = false;
+const setMic = on => document.querySelectorAll('.mic').forEach(b => b.classList.toggle('on', on));
+function showVoice(you, bot, isErr) {
+  $('vyou').textContent = you || '';
+  $('vbot').textContent = bot || '';
+  $('vp').classList.toggle('err', !!isErr);
+  $('vp').classList.add('show');
+}
+function speak(t) {
+  if (!('speechSynthesis' in window) || !t) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t);
+  u.lang = /[\u0600-\u06FF]/.test(t) ? 'ar-SA' : 'en-US';
+  speechSynthesis.speak(u);
+}
+async function handleVoice(text) {
+  showVoice(text, '…');
+  try {
+    const d = await askServer(text, S.sel >= 0);
+    const msg = await runAction(d);
+    showVoice(text, msg); speak(msg);
+  } catch (e) { showVoice(text, e.message || 'تعذّر الاتصال.', true); }
+}
+function startVoice() {
+  if (!SR) return showVoice('', 'المتصفح لا يدعم الأوامر الصوتية. جرّب Chrome أو Edge.', true);
+  if (listening) { try { recog.stop(); } catch (e) {} return; }
+  if (S.audio && !S.audio.paused) { S.audio.pause(); $('play').textContent = '▶'; }   // so the recitation is not heard as speech
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  recog = new SR();
+  recog.lang = vlang; recog.interimResults = true; recog.continuous = false; recog.maxAlternatives = 1;
+  let heard = '';
+  recog.onstart = () => { listening = true; setMic(true); showVoice('', vlang === 'ar-SA' ? 'أستمع إليك…' : 'Listening…'); };
+  recog.onresult = e => { heard = Array.from(e.results).map(r => r[0].transcript).join(' ').trim(); $('vyou').textContent = heard; };
+  recog.onerror = e => {
+    heard = '';
+    const msg = e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'اسمح للمتصفح باستخدام الميكروفون.'
+      : e.error === 'no-speech' ? 'لم أسمع شيئًا. حاول مرة أخرى.' : 'تعذّر الاستماع. حاول مرة أخرى.';
+    showVoice('', msg, true);
+  };
+  recog.onend = () => { listening = false; setMic(false); if (heard) handleVoice(heard); };
+  try { recog.start(); } catch (e) { showVoice('', 'تعذّر تشغيل الميكروفون.', true); }
+}
+document.querySelectorAll('.mic').forEach(b => b.onclick = e => { e.stopPropagation(); startVoice(); });
+$('vl').textContent = vlang === 'ar-SA' ? 'ع' : 'EN';
+$('vl').onclick = () => { vlang = vlang === 'ar-SA' ? 'en-US' : 'ar-SA'; store.set('vlang', vlang); $('vl').textContent = vlang === 'ar-SA' ? 'ع' : 'EN'; };
+$('vx').onclick = () => {
+  $('vp').classList.remove('show');
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (listening) { try { recog.stop(); } catch (e) {} }
+};
 
 // ---------- Offline / install ----------
 if ('serviceWorker' in navigator) {
