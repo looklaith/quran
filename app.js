@@ -1,4 +1,3 @@
-const API = 'https://api.alquran.cloud/v1/';
 const $ = id => document.getElementById(id);
 const S = { page: 1, ayahs: [], sel: -1, loadId: 0, audio: null, surahs: null };
 const cache = {};
@@ -12,17 +11,35 @@ const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 // Text from outside APIs is never trusted as HTML: turn < > & " into harmless characters first.
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// One request per page+edition, cached, so going back and forth is instant.
-function get(key, url) {
-  if (!cache[key]) {
-    cache[key] = fetch(url).then(r => r.json()).then(d => {
-      if (d.status !== 'OK') throw new Error('bad');
-      return d.data.ayahs;
-    }).catch(e => { delete cache[key]; throw e; });
+// ---------- Quran data ----------
+// The whole Quran, tafsir and translations ship with the app in /data, and the service worker
+// keeps them on the phone, so reading works with no internet.
+// quran.json = { s: [[name, englishName, ayahCount]], a: [[text, surah, numberInSurah, page, juz]] }
+// <edition>.json = one string per ayah, in the same global order.
+const EDITIONS = ['ar.muyassar', 'en.sahih', 'fr.hamidullah', 'ur.jalandhry', 'tr.diyanet'];
+const json = url => fetch(url).then(r => { if (!r.ok) throw new Error('bad'); return r.json(); });
+function db() {
+  if (!cache.db) {
+    cache.db = json('/data/quran.json').then(d => {
+      const surahs = d.s.map((x, i) => ({ number: i + 1, name: x[0], englishName: x[1], numberOfAyahs: x[2] }));
+      const pages = [], firstPage = [];
+      d.a.forEach((x, i) => {
+        const a = { number: i + 1, text: x[0], surah: surahs[x[1] - 1], numberInSurah: x[2], page: x[3], juz: x[4] };
+        (pages[a.page] = pages[a.page] || []).push(a);
+        if (a.numberInSurah === 1) firstPage[x[1]] = a.page;
+      });
+      return { surahs, pages, firstPage };
+    }).catch(e => { delete cache.db; throw e; });
   }
-  return cache[key];
+  return cache.db;
 }
-const quran = p => get('q' + p, API + 'page/' + p + '/quran-uthmani');
+const quran = p => db().then(d => d.pages[p]);
+const surahPage = n => db().then(d => { const p = d.firstPage[n]; if (!p) throw new Error('bad'); return p; });
+function edition(ed) {
+  if (!EDITIONS.includes(ed)) return Promise.reject(new Error('bad'));
+  if (!cache[ed]) cache[ed] = json('/data/' + ed + '.json').catch(e => { delete cache[ed]; throw e; });
+  return cache[ed];
+}
 // Tajweed text comes from Quran.com (HTML tags per rule). Keyed by page + ayah number in surah.
 const tjCache = {};
 function tajweed(p) {
@@ -44,7 +61,11 @@ function tajweed(p) {
   }
   return tjCache[p];
 }
-const extra = (p, ed) => get(ed + p, API + 'page/' + p + '/' + ed);
+// Translation / tafsir rows for one page, in the same order as the page's ayahs.
+const extra = async (p, ed) => {
+  const [list, page] = await Promise.all([edition(ed), quran(p)]);
+  return page.map(a => ({ text: list[a.number - 1] }));
+};
 
 // ---------- Page loading ----------
 async function loadPage(p, opts = {}) {
@@ -91,7 +112,9 @@ async function loadPage(p, opts = {}) {
         }
       }
     }
-    h += `<span class="ayah" data-i="${i}">${t}<span class="num">﴿${ar(shownNo(a))}﴾</span></span> `;
+    // The 15 sajdah (prostration) verses carry the ۩ sign in the Quran text; underline them.
+    const sajda = a.text.includes('۩') ? ' sajda' : '';
+    h += `<span class="ayah${sajda}" data-i="${i}">${t}<span class="num">﴿${ar(shownNo(a))}﴾</span></span> `;
   });
   const box = $('text');
   box.className = '';
@@ -105,8 +128,6 @@ async function loadPage(p, opts = {}) {
   $('lbl').textContent = `${ayahs[0].surah.name} · الجزء ${ar(ayahs[0].juz)} · صفحة ${ar(p)}`;
   closeSheet();
   store.set('lastPage', p);
-  if (p < 604) quran(p + 1).catch(() => {});   // preload neighbours
-  if (p > 1) quran(p - 1).catch(() => {});
   if (opts.play) playFrom(0);
 }
 const go = d => loadPage(S.page + d);
@@ -159,17 +180,24 @@ function playFrom(i) {
   stopAudio();
   if (i >= S.ayahs.length) { if (S.page < 604) loadPage(S.page + 1, { play: true }); return; }
   const a = S.ayahs[i];
-  const sel = $('rec');
-  const br = sel.options[sel.selectedIndex].dataset.br || '128';
-  const au = new Audio(`https://cdn.islamic.network/quran/audio/${br}/${sel.value}/${a.number}.mp3`);
+  const opt = $('rec').options[$('rec').selectedIndex];
+  // Most reciters come from islamic.network (by global ayah number). Reciters marked data-ea
+  // come from everyayah.com, where files are named by surah + ayah, e.g. 002255.mp3.
+  const pad = n => String(n).padStart(3, '0');
+  const url = opt.dataset.ea
+    ? `https://everyayah.com/data/${opt.dataset.ea}/${pad(a.surah.number)}${pad(a.numberInSurah)}.mp3`
+    : `https://cdn.islamic.network/quran/audio/${opt.dataset.br || '128'}/${opt.value}/${a.number}.mp3`;
+  const au = new Audio(url);
   S.audio = au;
   $('play').textContent = '⏸';
   const el = document.querySelector(`.ayah[data-i="${i}"]`);
   el.classList.add('cur');
   el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   au.onended = () => playFrom(i + 1);
-  au.onerror = stopAudio;            // stop instead of silently skipping to the wrong ayah
-  au.play().catch(stopAudio);
+  // Stop instead of silently skipping to the wrong ayah. Recitation is streamed, so say so when offline.
+  const fail = () => { stopAudio(); if (!navigator.onLine) showVoice('', 'التلاوة الصوتية تحتاج إلى الإنترنت. القراءة تعمل بدونه.', true); };
+  au.onerror = fail;
+  au.play().catch(e => { if (S.audio === au) fail(); });
 }
 function togglePlay() {
   const a = S.audio;
@@ -211,7 +239,7 @@ function renderList() {
 async function openList() {
   $('drawer').classList.add('open');
   if (!S.surahs) {
-    try { S.surahs = (await (await fetch(API + 'surah')).json()).data; renderList(); }
+    try { S.surahs = (await db()).surahs; renderList(); }
     catch (e) { $('list').innerHTML = '<li>⚠️ تعذّر التحميل</li>'; }
   }
 }
@@ -222,10 +250,7 @@ $('q').oninput = () => S.surahs && renderList();
 $('list').onclick = async e => {
   const li = e.target.closest('li'); if (!li) return;
   closeList();
-  try {
-    const d = await (await fetch(API + 'ayah/' + li.dataset.n + ':1')).json();
-    loadPage(d.data.page);
-  } catch (err) {}
+  try { loadPage(await surahPage(+li.dataset.n)); } catch (err) {}
 };
 $('trSel').onchange = () => { store.set('tr', $('trSel').value); if (S.sel >= 0) fill(S.sel); };
 $('rec').onchange = () => { store.set('rec', $('rec').value); };
@@ -296,10 +321,7 @@ async function askServer(q, useAyah) {
 async function runAction(d) {
   const say = d.answer || '';
   switch (d.action) {
-    case 'goto_surah': {
-      const x = await (await fetch(API + 'ayah/' + d.value + ':1')).json();
-      await loadPage(x.data.page); break;
-    }
+    case 'goto_surah': await loadPage(await surahPage(+d.value)); break;
     case 'goto_page': await loadPage(d.value); break;
     case 'next_page': await go(1); break;
     case 'prev_page': await go(-1); break;
@@ -389,3 +411,6 @@ $('vx').onclick = () => {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
 }
+// Keep the chosen translation on the phone too (the Quran text and tafsir are saved when the app installs).
+$('trSel').addEventListener('change', () => edition($('trSel').value).catch(() => {}));
+if ($('trSel').value !== 'none') edition($('trSel').value).catch(() => {});
