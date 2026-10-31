@@ -1,13 +1,13 @@
-const CACHE = 'mushafi-v5';
+const CACHE = 'mushafi-v7';
 const TAJWEED = 'mushafi-tajweed';          // pages already opened with tajweed, kept across updates
 const FONTS = [
   'Amiri-400-arabic', 'Amiri-400-latin-ext', 'Amiri-400-latin',
   'Amiri-700-arabic', 'Amiri-700-latin-ext', 'Amiri-700-latin',
-  'AmiriQuran-400-arabic', 'AmiriQuran-400-latin'
+  'AmiriQuran-400-arabic', 'AmiriQuran-400-latin', 'UthmanicHafs1Ver18'
 ].map(f => '/fonts/' + f + '.woff2');
 // Everything needed to read the whole Quran with tafsir, with no internet.
 const SHELL = ['/', '/index.html', '/app.js', '/manifest.json', '/icon-192.png', '/icon-512.png', '/privacy.html',
-  '/fonts/fonts.css', ...FONTS, '/data/quran.json', '/data/ar.muyassar.json'];
+  '/fonts/fonts.css', ...FONTS, '/data/quran.json', '/data/lines.json', '/data/ar.muyassar.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));

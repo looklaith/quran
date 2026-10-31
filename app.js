@@ -7,6 +7,9 @@ const store = {
 };
 // Number shown on screen: in Al-Fatihah the Bismillah is an unnumbered heading, so verses shift down by one.
 const shownNo = a => a.surah.number === 1 ? a.numberInSurah - 1 : a.numberInSurah;
+const JUZ = ['الأَوَّلُ', 'الثَّانِي', 'الثَّالِثُ', 'الرَّابِعُ', 'الخَامِسُ', 'السَّادِسُ', 'السَّابِعُ', 'الثَّامِنُ', 'التَّاسِعُ', 'العَاشِرُ',
+  'الحَادِي عَشَرَ', 'الثَّانِي عَشَرَ', 'الثَّالِثَ عَشَرَ', 'الرَّابِعَ عَشَرَ', 'الخَامِسَ عَشَرَ', 'السَّادِسَ عَشَرَ', 'السَّابِعَ عَشَرَ', 'الثَّامِنَ عَشَرَ', 'التَّاسِعَ عَشَرَ', 'العِشْرُونَ',
+  'الحَادِي وَالعِشْرُونَ', 'الثَّانِي وَالعِشْرُونَ', 'الثَّالِثُ وَالعِشْرُونَ', 'الرَّابِعُ وَالعِشْرُونَ', 'الخَامِسُ وَالعِشْرُونَ', 'السَّادِسُ وَالعِشْرُونَ', 'السَّابِعُ وَالعِشْرُونَ', 'الثَّامِنُ وَالعِشْرُونَ', 'التَّاسِعُ وَالعِشْرُونَ', 'الثَّلَاثُونَ'];
 const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 // Text from outside APIs is never trusted as HTML: turn < > & " into harmless characters first.
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -34,28 +37,35 @@ function db() {
   return cache.db;
 }
 const quran = p => db().then(d => d.pages[p]);
+// lines.json = the printed Madani Mushaf layout (15 lines a page, 8 on pages 1-2), one entry per page.
+// Each line is ["h", surah] (surah title), ["b"] (Bismillah), or [[ayahNumber, words, endsHere], ...].
+function layout(p) {
+  if (!cache.lines) cache.lines = json('/data/lines.json').catch(e => { delete cache.lines; throw e; });
+  return cache.lines.then(l => l[p]);
+}
 const surahPage = n => db().then(d => { const p = d.firstPage[n]; if (!p) throw new Error('bad'); return p; });
 function edition(ed) {
   if (!EDITIONS.includes(ed)) return Promise.reject(new Error('bad'));
   if (!cache[ed]) cache[ed] = json('/data/' + ed + '.json').catch(e => { delete cache[ed]; throw e; });
   return cache[ed];
 }
-// Tajweed text comes from Quran.com (HTML tags per rule). Keyed by page + ayah number in surah.
+// Tajweed text comes from Quran.com, word by word (HTML tag per rule), with the same line numbers
+// as lines.json. Keyed by "line:ayahNumber" -> the tajweed words of that ayah on that line.
 const tjCache = {};
 function tajweed(p) {
   if (!tjCache[p]) {
-    tjCache[p] = fetch('https://api.quran.com/api/v4/verses/by_page/' + p + '?words=false&per_page=300&fields=text_uthmani_tajweed')
+    tjCache[p] = fetch('https://api.quran.com/api/v4/verses/by_page/' + p + '?words=true&per_page=50&word_fields=text_uthmani_tajweed,line_number')
       .then(r => r.json()).then(d => {
         const m = {};
-        d.verses.forEach(v => {
-          // Drop the end-of-ayah span (we draw our own number), escape everything,
-          // then bring back ONLY plain <tajweed class=name> tags. Any other HTML stays harmless text.
-          const raw = String(v.text_uthmani_tajweed || '').replace(/<span class=end>.*?<\/span>/g, '');
-          m[v.verse_key] = esc(raw)
-            .replace(/&lt;tajweed class=(?:&quot;)?([a-z_]+)(?:&quot;)?&gt;/g, '<tajweed class="$1">')
-            .replace(/&lt;\/tajweed&gt;/g, '</tajweed>')
-            .trim();
-        });
+        d.verses.forEach(v => v.words.forEach(w => {
+          if (w.char_type_name !== 'word') return;          // we draw our own ayah number
+          // Escape everything, then bring back ONLY plain <rule class=name> tags. Any other HTML stays harmless text.
+          const html = esc(w.text_uthmani_tajweed)
+            .replace(/&lt;rule class=(?:&quot;)?([a-z_-]+)(?:&quot;)?&gt;/g, '<tajweed class="$1">')
+            .replace(/&lt;\/rule&gt;/g, '</tajweed>');
+          const k = w.line_number + ':' + v.id;
+          (m[k] = m[k] || []).push(html);           // one entry per word, in order
+        }));
         return m;
       }).catch(e => { delete tjCache[p]; throw e; });
   }
@@ -73,57 +83,61 @@ async function loadPage(p, opts = {}) {
   const dir = p >= S.page ? 'next' : 'prev';
   const id = ++S.loadId;          // newest request wins, so fast clicks never mix pages
   stopAudio();
-  let ayahs, tj = null;
+  let ayahs, lines, surahs, tj = null;
   try {
-    ayahs = await quran(p);
+    [ayahs, lines, { surahs }] = await Promise.all([quran(p), layout(p), db()]);
     if (document.body.classList.contains('tj')) { try { tj = await tajweed(p); } catch (e) { tj = null; } }
   }
   catch (e) { if (id === S.loadId) $('text').innerHTML = '<div class="msg">⚠️ تعذّر التحميل. تحقق من الإنترنت.</div>'; return; }
   if (id !== S.loadId) return;
 
   S.page = p; S.ayahs = ayahs; S.sel = -1;
+  // Draw the page line by line, exactly as the printed Mushaf. An ayah split over lines becomes
+  // several spans with the same data-i, so tapping, highlighting and audio treat them as one ayah.
+  const base = ayahs[0].number;
   let h = '';
-  ayahs.forEach((a, i) => {
-    const n = a.surah.number;
-    const first = a.numberInSurah === 1;
-    // Plain text, or the tajweed-tagged text for this same ayah when the switch is on.
-    let t = (tj && tj[n + ':' + a.numberInSurah]) || esc(a.text);
-    // Al-Fatihah: ayah 1 IS the Bismillah. Show it only as the (unnumbered) heading.
-    // It keeps data-i so audio, highlighting and tap still work; numbering below shifts by one.
-    if (n === 1 && a.numberInSurah === 1) {
-      h += `<span class="sura">${esc(a.surah.name)}</span>`;
-      h += `<span class="bism ayah" data-i="${i}">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</span>`;
-      return;
-    }
-    if (first) {
-      h += `<span class="sura">${esc(a.surah.name)}</span>`;
-      // The Bismillah is ALWAYS shown as a heading, in the same place for every surah
-      // (including Al-Fatihah), except At-Tawbah (surah 9) which has none.
-      if (n !== 9) h += `<span class="bism">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</span>`;
-      // Remove the Bismillah from the start of ayah 1 so it is not shown twice.
-      // Works for plain text and for tajweed text (words may be wrapped in tags).
-      if (n !== 9) {
-        const words = t.split(/ (?![^<]*>)/);          // split on spaces that are not inside a tag
-        const clean = w => w.replace(/<[^>]*>/g, '')
-          .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '')
-          .replace(/[\u0671\u0622\u0623\u0625]/g, '\u0627');
-        if (words.length > 4 && clean(words[0]) === '\u0628\u0633\u0645' && clean(words[1]) === '\u0627\u0644\u0644\u0647') {
-          t = words.slice(4).join(' ');
-        }
+  lines.forEach((ln, L) => {
+    if (ln[0] === 'h') { h += `<div class="line sura">${esc(surahs[ln[1] - 1].name)}</div>`; return; }
+    if (ln[0] === 'b') { h += '<div class="line bism">بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ</div>'; return; }
+    h += '<div class="line">' + ln.map(([g, words, end]) => {
+      const i = g - base, a = ayahs[i];
+      // Plain text, or the tajweed-tagged words of this same ayah on this same line when the switch is on.
+      // Small pause marks (ۖ ۗ ۚ ۛ ...) come as separate words; join them to the word before, as in print.
+      // In the Mushaf text the mark ۤ (U+06E4) makes the font draw the line ABOVE the word of
+      // prostration. Tajweed colouring splits the letters so the font cannot draw it; there the
+      // same words get a CSS overline instead (matched word by word with the Mushaf text).
+      let tw = tj && tj[(L + 1) + ':' + g];
+      if (tw) {
+        const qw = words.split(' ').reduce((acc, w) => {          // a lone mark (e.g. ۩) belongs to the word before
+          if (acc.length && /^[ۖ-ۭ]+$/.test(w)) acc[acc.length - 1] += ' ' + w; else acc.push(w);
+          return acc;
+        }, []);
+        tw = tw.map((w, j) => qw[j] && qw[j].includes('ۤ') ? `<span class="ovl">${w}</span>` : w).join(' ');
       }
-    }
-    // The 15 sajdah (prostration) verses carry the ۩ sign in the Quran text; underline them.
-    const sajda = a.text.includes('۩') ? ' sajda' : '';
-    h += `<span class="ayah${sajda}" data-i="${i}">${t}<span class="num">﴿${ar(shownNo(a))}﴾</span></span> `;
+      const t = (tw || esc(words)).replace(/ ([ۖ-ۜ]+)(?= |$)/g, '$1');
+      // Al-Fatihah: ayah 1 IS the Bismillah; it stays unnumbered and the numbering shifts by one.
+      // In the Mushaf font, Arabic digits are drawn inside the ornate ayah circle.
+      const num = end && shownNo(a) > 0 ? `<span class="num">${ar(shownNo(a))}</span>` : '';
+      // The 15 sajdah (prostration) verses carry the ۩ sign in the Quran text.
+      const sajda = a.text.includes('۩') ? ' sajda' : '';
+      // The tajweed text leaves out the ۩ sign, so put it back at the end of a sajdah verse.
+      const mark = sajda && end && !t.includes('۩') ? ' ۩' : '';
+      return `<span class="ayah${sajda}" data-i="${i}">${t}${mark}${num}</span>`;
+    }).join(' ') + '</div>';
   });
   const box = $('text');
-  box.className = '';
+  box.className = p <= 2 ? 'opening' : '';
   box.innerHTML = h;
+  fitPage();
   $('reader').scrollTop = 0;
   if (!opts.noAnim && !matchMedia('(prefers-reduced-motion:reduce)').matches) {
     void box.offsetWidth;                 // restart the animation
-    box.className = 'in-' + dir;
+    box.classList.add('in-' + dir);
   }
+  // Page header and footer, as printed: surah of the page, juz in words, page number.
+  $('hSura').textContent = 'سُورَةُ ' + ayahs[0].surah.name.replace(/^سُورَةُ\s*/, '');
+  $('hJuz').textContent = 'الجُزْءُ ' + JUZ[ayahs[0].juz - 1];
+  $('hPage').textContent = ar(p);
   $('pg').value = p;
   $('lbl').textContent = `${ayahs[0].surah.name} · الجزء ${ar(ayahs[0].juz)} · صفحة ${ar(p)}`;
   closeSheet();
@@ -131,6 +145,25 @@ async function loadPage(p, opts = {}) {
   if (opts.play) playFrom(0);
 }
 const go = d => loadPage(S.page + d);
+
+// Every line must fit the screen without wrapping (that would break the Mushaf layout).
+// Measure the widest line at the chosen font size and shrink the text only as much as needed.
+function fitPage() {
+  // On wide screens the page is only as wide as its longest line, like a printed page.
+  const box = $('text'), page = $('page');
+  box.style.fontSize = ''; page.style.maxWidth = '';
+  box.classList.add('measure');
+  let widest = 0;
+  box.querySelectorAll('.line').forEach(l => { widest = Math.max(widest, l.offsetWidth); });
+  box.classList.remove('measure');
+  const room = box.clientWidth;
+  if (!widest) return;
+  if (widest > room) box.style.fontSize = (fs * room / widest * 0.98).toFixed(3) + 'rem';
+  else page.style.maxWidth = Math.ceil(widest * 1.04 + page.offsetWidth - room) + 'px';
+}
+let fitTimer;
+addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitPage, 100); });
+if (document.fonts) document.fonts.ready.then(fitPage);
 
 // ---------- Tap handling ----------
 $('reader').addEventListener('click', e => {
@@ -144,7 +177,7 @@ $('reader').addEventListener('click', e => {
 function selectAyah(i) {
   S.sel = i;
   document.querySelectorAll('.ayah.sel').forEach(e => e.classList.remove('sel'));
-  document.querySelector(`.ayah[data-i="${i}"]`).classList.add('sel');
+  document.querySelectorAll(`.ayah[data-i="${i}"]`).forEach(e => e.classList.add('sel'));
   const a = S.ayahs[i];
   $('ref').textContent = a.surah.number === 1 && a.numberInSurah === 1 ? `${a.surah.name} · البسملة` : `${a.surah.name} ﴿${ar(shownNo(a))}﴾`;
   $('sheet').classList.add('open');
@@ -190,9 +223,9 @@ function playFrom(i) {
   const au = new Audio(url);
   S.audio = au;
   $('play').textContent = '⏸';
-  const el = document.querySelector(`.ayah[data-i="${i}"]`);
-  el.classList.add('cur');
-  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  const parts = document.querySelectorAll(`.ayah[data-i="${i}"]`);
+  parts.forEach(e => e.classList.add('cur'));
+  if (parts[0]) parts[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
   au.onended = () => playFrom(i + 1);
   // Stop instead of silently skipping to the wrong ayah. Recitation is streamed, so say so when offline.
   const fail = () => { stopAudio(); if (!navigator.onLine) showVoice('', 'التلاوة الصوتية تحتاج إلى الإنترنت. القراءة تعمل بدونه.', true); };
@@ -291,6 +324,7 @@ function setFont(v) {
   fs = Math.max(1.2, Math.min(3.5, +v.toFixed(1)));
   document.documentElement.style.setProperty('--fs', fs + 'rem');
   store.set('fs', fs);
+  fitPage();
 }
 $('fMinus').onclick = () => setFont(fs - 0.1);
 $('fPlus').onclick = () => setFont(fs + 0.1);
