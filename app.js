@@ -154,8 +154,12 @@ function fitPage() {
   box.style.fontSize = ''; page.style.maxWidth = ''; page.style.minHeight = '0';
   box.classList.add('measure');
   let widest = 0;
-  box.querySelectorAll('.line').forEach(l => { widest = Math.max(widest, l.offsetWidth); });
+  const ls = [...box.querySelectorAll('.line')], widths = ls.map(l => l.offsetWidth);
+  widths.forEach(w => { widest = Math.max(widest, w); });
   box.classList.remove('measure');
+  // A line with only a few words (e.g. the end of An-Nas) would get huge gaps if stretched to the
+  // full width; the printed Mushaf lengthens letters instead, which browsers cannot do. Centre it.
+  ls.forEach((l, i) => l.classList.toggle('short', widths[i] < widest * 0.65));
   const room = box.clientWidth;
   if (!widest) { page.style.minHeight = ''; return; }
   const frameW = page.offsetWidth - room;
