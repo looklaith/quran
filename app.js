@@ -52,6 +52,10 @@ function edition(ed) {
 // Tajweed text comes from Quran.com, word by word (HTML tag per rule), with the same line numbers
 // as lines.json. Keyed by "line:ayahNumber" -> the tajweed words of that ayah on that line.
 const tjCache = {};
+// Only the letters of a text (no tags, marks, spaces or kashida), to check that the tajweed words and
+// the Mushaf words are the same words. Yeh and hamza are left out: the two sources write them in
+// different ways (e.g. هَدَىٰكُمۡ), which is spelling, not a different word.
+const bareLetters = s => s.replace(/<[^>]+>/g, '').replace(/[^آ-ؿف-ىيٱ-ۓ]|[يىیء]/g, '');
 function tajweed(p) {
   if (!tjCache[p]) {
     tjCache[p] = fetch('https://api.quran.com/api/v4/verses/by_page/' + p + '?words=true&per_page=50&word_fields=text_uthmani_tajweed,line_number')
@@ -116,6 +120,9 @@ async function loadPage(p, opts = {}) {
       // prostration. Tajweed colouring splits the letters so the font cannot draw it; there the
       // same words get a CSS overline instead (matched word by word with the Mushaf text).
       let tw = tj && tj[(L + 1) + ':' + g];
+      // Quran.com sometimes breaks a line in a different place (e.g. Al-Anfal 6, As-Saffat 130), which
+      // would drop or repeat a word. Use its tajweed only when it has exactly the Mushaf's letters.
+      if (tw && bareLetters(tw.join(' ')) !== bareLetters(words)) tw = null;
       if (tw) {
         const qw = words.split(' ').reduce((acc, w) => {          // a lone mark (e.g. ۩) belongs to the word before
           if (acc.length && /^[ۖ-ۭ]+$/.test(w)) acc[acc.length - 1] += ' ' + w; else acc.push(w);
