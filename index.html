@@ -82,6 +82,18 @@ body.menu #top,body.menu #bot{transform:none}
 #text.in-next{animation:pageInNext .3s ease-out}
 #text.in-prev{animation:pageInPrev .3s ease-out}
 @media (prefers-reduced-motion:reduce){#text{animation:none!important}}
+/* Other page-turn styles (menu setting): slide sideways, or move up/down like scrolling. */
+#reader{overflow-x:hidden;overscroll-behavior:contain}
+#reader.anim{overflow:hidden}
+@keyframes slideNext{from{transform:translateX(-100%)}}
+@keyframes slidePrev{from{transform:translateX(100%)}}
+@keyframes scrollNext{from{transform:translateY(100%)}}
+@keyframes scrollPrev{from{transform:translateY(-100%)}}
+#page.slide-next{animation:slideNext .3s ease-out}
+#page.slide-prev{animation:slidePrev .3s ease-out}
+#page.scroll-next{animation:scrollNext .35s ease-out}
+#page.scroll-prev{animation:scrollPrev .35s ease-out}
+@media (prefers-reduced-motion:reduce){#page{animation:none!important}}
 
 /* ---- tajweed colors (only when the switch is on) ---- */
 #text tajweed{color:inherit}
@@ -214,6 +226,11 @@ body.tj #legend.show{display:block}
       <option value="ar.abdulbasitmurattal" data-br="64">عبد الباسط</option>
       <option value="ar.abdurrahmaansudais" data-br="64">السديس</option>
       <option value="ar.aymansowaid" data-ea="Ayman_Sowaid_64kbps">أيمن سويد</option>
+    </select>
+    <select id="turnSel" title="طريقة تقليب الصفحات">
+      <option value="flip">تقليب الصفحات: قلب الصفحة</option>
+      <option value="slide">تقليب الصفحات: سحب يمين / يسار</option>
+      <option value="scroll">تقليب الصفحات: تمرير لأسفل</option>
     </select>
     <button id="tjBtn" aria-pressed="false">التجويد: إيقاف</button>
     <button id="lgBtn" style="display:none">دليل الألوان</button>

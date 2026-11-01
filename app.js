@@ -181,10 +181,21 @@ async function loadPage(p, opts = {}) {
   box.className = p <= 2 ? 'opening' : '';
   box.innerHTML = h;
   fitPage();
-  $('reader').scrollTop = 0;
+  // Scrolling back up lands at the bottom of the previous page (matters only when a page scrolls).
+  $('reader').scrollTop = S.turn === 'scroll' && dir === 'prev' && !opts.noAnim ? 1e6 : 0;
   if (!opts.noAnim && !matchMedia('(prefers-reduced-motion:reduce)').matches) {
-    void box.offsetWidth;                 // restart the animation
-    box.classList.add('in-' + dir);
+    if (S.turn === 'flip') {
+      void box.offsetWidth;                 // restart the animation
+      box.classList.add('in-' + dir);
+    } else {                                // the whole page slides in sideways, or from below / above
+      const pg = $('page');
+      pg.classList.remove(...TURN_ANIMS);
+      void pg.offsetWidth;
+      $('reader').classList.add('anim');    // no scrollbars while the page moves
+      pg.classList.add(S.turn + '-' + dir);
+      clearTimeout(S.turnTimer);
+      S.turnTimer = setTimeout(endTurnAnim, 600);   // in case the animation-end event never comes
+    }
   }
   // Page header and footer, as printed: surah of the page, juz in words, page number.
   $('hSura').textContent = 'سُورَةُ ' + ayahs[0].surah.name.replace(/^سُورَةُ\s*/, '');
@@ -473,16 +484,58 @@ $('sx').onclick = closeSheet;
 $('next').onclick = () => go(1);
 $('prev').onclick = () => go(-1);
 $('pg').onchange = () => loadPage(parseInt($('pg').value) || S.page);
+// Three ways to turn pages (menu setting): flip (page turns), slide (sideways), scroll (up / down).
+const TURNS = ['flip', 'slide', 'scroll'], TURN_ANIMS = ['slide-next', 'slide-prev', 'scroll-next', 'scroll-prev'];
+function setTurn(t) {
+  S.turn = TURNS.includes(t) ? t : 'flip';
+  $('turnSel').value = S.turn;
+  store.set('turn', S.turn);
+}
+$('turnSel').onchange = () => setTurn($('turnSel').value);
+function endTurnAnim() {
+  $('page').classList.remove(...TURN_ANIMS);
+  $('reader').classList.remove('anim');
+}
+$('page').addEventListener('animationend', e => { if (e.target === $('page')) endTurnAnim(); });
+// In scroll mode a page that is taller than the screen first scrolls normally; the page turns only
+// when it is already at its bottom (next) or top (previous).
+const atBottom = () => { const r = $('reader'); return r.scrollTop + r.clientHeight >= r.scrollHeight - 2; };
+const atTop = () => $('reader').scrollTop <= 1;
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 'ArrowLeft') go(1);
   if (e.key === 'ArrowRight') go(-1);
+  if (S.turn === 'scroll') {
+    if ((e.key === 'ArrowDown' || e.key === 'PageDown') && atBottom()) go(1);
+    if ((e.key === 'ArrowUp' || e.key === 'PageUp') && atTop()) go(-1);
+  }
 });
-let tx = 0, ty = 0;   // swipe right = next page (Arabic reads right to left)
-$('reader').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+let tx = 0, ty = 0, startBottom = false, startTop = false;   // swipe right = next page (Arabic reads right to left)
+$('reader').addEventListener('touchstart', e => {
+  tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  startBottom = atBottom(); startTop = atTop();
+}, { passive: true });
 $('reader').addEventListener('touchend', e => {
   const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+  if (S.turn === 'scroll') {                // finger up = next page, finger down = previous page
+    if (Math.abs(dy) > 70 && Math.abs(dy) > 2 * Math.abs(dx)) {
+      if (dy < 0 && startBottom) go(1);
+      else if (dy > 0 && startTop) go(-1);
+    }
+    return;
+  }
   if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy)) go(dx > 0 ? 1 : -1);
+}, { passive: true });
+// Mouse wheel / touchpad on a laptop, scroll mode only. A short pause after each turn so one
+// flick of the wheel turns one page, not several.
+let wheelSum = 0, wheelLock = 0;
+$('reader').addEventListener('wheel', e => {
+  if (S.turn !== 'scroll') return;
+  if (Date.now() < wheelLock) { wheelSum = 0; return; }
+  if ((e.deltaY > 0 && atBottom()) || (e.deltaY < 0 && atTop())) {
+    wheelSum += e.deltaY;
+    if (Math.abs(wheelSum) > 120) { wheelLock = Date.now() + 900; go(wheelSum > 0 ? 1 : -1); wheelSum = 0; }
+  } else wheelSum = 0;
 }, { passive: true });
 
 // ---------- Surah list ----------
@@ -559,6 +612,7 @@ if (store.get('tr')) $('trSel').value = store.get('tr');
 if (store.get('rec')) $('rec').value = store.get('rec');
 if (!$('rec').value) $('rec').selectedIndex = 0;
 setTajweed(store.get('tj') === '1');
+setTurn(store.get('turn'));
 loadPage(parseInt(store.get('lastPage')) || 1, { noAnim: true });
 
 // ---------- Ask the assistant (typed box + voice share one endpoint) ----------
