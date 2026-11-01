@@ -62,7 +62,17 @@ const bareLetters = s => s.replace(/<[^>]+>/g, '').replace(/[^آ-ؿف-ىيٱ-ۓ]
 // and the next character is a letter (a colour change before a vowel mark is left as it is).
 const ZWJ_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', ZWJ_MARK = /[ً-ٰٟۖ-ۭ]/,
       ZWJ_NEXT = /[آ-يٱ-ۓ]/;
+// Quran.com often puts a colour change between a letter and its vowel marks (إِ<نّ>َ, سَو<َا>ٓءٌ).
+// Safari cannot place a mark that is in a different span from its letter, so it shows it apart.
+// Move such marks across the tag so every mark sits with its own letter.
+const TAG_MARKS = new RegExp('(<tajweed[^>]*>|</tajweed>)(' + ZWJ_MARK.source + '+)', 'g');
+function marksWithLetter(html) {
+  let prev;
+  do { prev = html; html = html.replace(TAG_MARKS, '$2$1'); } while (html !== prev);
+  return html;
+}
 function joinAcrossTags(html) {
+  html = marksWithLetter(html);
   const out = [];
   let lastBase = null, pending = -1;                 // pending: where the tag(s) of a colour change start in `out`
   for (const part of html.split(/(<[^>]+>)/)) {
