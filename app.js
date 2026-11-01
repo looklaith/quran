@@ -241,13 +241,20 @@ async function fill(i) {
 }
 
 // ---------- Audio (one file per ayah, by its global ayah number) ----------
+// Ayah repetition: each ayah is recited S.rep times in a row before moving on (1 = normal reading).
+// After the last repetition it goes on to the next ayah, or stops if "auto next" is switched off.
+S.rep = Math.max(1, Math.min(999, parseInt(store.get('rep')) || 1));
+S.autoNext = store.get('repNext') !== '0';
+S.playing = null;                         // { i, n }: ayah index on this page and which repetition
 function stopAudio() {
   const a = S.audio; S.audio = null;
   if (a) { a.onended = a.onerror = null; a.pause(); a.removeAttribute('src'); a.load(); }
   $('play').textContent = '▶';
   document.querySelectorAll('.ayah.cur').forEach(e => e.classList.remove('cur'));
+  S.playing = null;
+  showRep();
 }
-function playFrom(i) {
+function playFrom(i, n = 1) {
   stopAudio();
   if (i >= S.ayahs.length) { if (S.page < 604) loadPage(S.page + 1, { play: true }); return; }
   const a = S.ayahs[i];
@@ -264,12 +271,62 @@ function playFrom(i) {
   const parts = document.querySelectorAll(`.ayah[data-i="${i}"]`);
   parts.forEach(e => e.classList.add('cur'));
   if (parts[0]) parts[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
-  au.onended = () => playFrom(i + 1);
   // Stop instead of silently skipping to the wrong ayah. Recitation is streamed, so say so when offline.
   const fail = () => { stopAudio(); if (!navigator.onLine) showVoice('', 'التلاوة الصوتية تحتاج إلى الإنترنت. القراءة تعمل بدونه.', true); };
+  S.playing = { i, n };
+  showRep();
+  au.onended = () => {
+    if (S.audio !== au) return;
+    if (S.playing.n < S.rep) {               // same ayah again, from the start of the same audio file
+      S.playing.n++;
+      showRep();
+      au.currentTime = 0;
+      au.play().catch(() => { if (S.audio === au) fail(); });
+      return;
+    }
+    if (S.rep > 1 && !S.autoNext) { stopAudio(); return; }
+    playFrom(i + 1);
+  };
   au.onerror = fail;
   au.play().catch(e => { if (S.audio === au) fail(); });
 }
+
+// ---------- Ayah repetition menu ----------
+function showRep() {
+  const btn = $('repBtn');
+  btn.textContent = S.rep > 1 ? '🔁 ' + ar(S.rep) : '🔁 تكرار';
+  btn.classList.toggle('on', S.rep > 1);
+  document.querySelectorAll('#repPresets button').forEach(b => b.classList.toggle('on', +b.dataset.n === S.rep));
+  if (document.activeElement !== $('repN')) $('repN').value = S.rep;
+  $('repNext').checked = S.autoNext;
+  const p = S.playing, a = p && S.ayahs[p.i];
+  $('repStat').textContent = !a ? (S.rep > 1 ? `كل آية ستُكرَّر ${ar(S.rep)} مرة.` : 'بدون تكرار (قراءة عادية).')
+    : `${a.surah.name} ﴿${ar(shownNo(a))}﴾ — التكرار ${ar(p.n)} من ${ar(S.rep)}`;
+}
+function setRep(n) {
+  S.rep = Math.max(1, Math.min(999, parseInt(n) || 1));
+  store.set('rep', S.rep);
+  if (S.playing && S.playing.n > S.rep) S.playing.n = S.rep;   // lowering it mid-ayah finishes this ayah
+  showRep();
+}
+$('repBtn').onclick = e => {
+  e.stopPropagation();
+  const open = !$('repPanel').classList.contains('show');
+  $('repPanel').classList.toggle('show', open);
+  $('repBtn').setAttribute('aria-expanded', open);
+  showRep();
+};
+$('repX').onclick = () => { $('repPanel').classList.remove('show'); $('repBtn').setAttribute('aria-expanded', false); };
+$('repPresets').onclick = e => { const b = e.target.closest('button'); if (b) setRep(b.dataset.n); };
+$('repN').onchange = () => setRep($('repN').value);
+$('repNext').onchange = () => { S.autoNext = $('repNext').checked; store.set('repNext', S.autoNext ? '1' : '0'); };
+// Start from the ayah being recited, else the tapped ayah, else the first ayah of the page.
+$('repPlay').onclick = () => {
+  const i = S.playing ? S.playing.i : (S.sel >= 0 ? S.sel : 0);
+  if (S.rep === 1) setRep(parseInt($('repN').value) > 1 ? $('repN').value : 20);
+  playFrom(i);
+};
+$('repStop').onclick = stopAudio;
 function togglePlay() {
   const a = S.audio;
   if (a) {

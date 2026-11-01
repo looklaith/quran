@@ -109,6 +109,19 @@ body.tj #legend.show{display:block}
 .mic.on{background:var(--accent);color:var(--bg);border-color:var(--accent);animation:micPulse 1.1s ease-in-out infinite}
 @keyframes micPulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 30%,transparent)}}
 @media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
+/* ---- ayah repetition menu ---- */
+#repBtn.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+#repPanel{position:fixed;top:calc(64px + env(safe-area-inset-top));left:10px;z-index:45;width:min(320px,calc(100vw - 20px));background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:1rem}
+#repPanel.show{display:block}
+#repPanel .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}
+#repPanel small{display:block;margin:8px 0 6px;color:var(--accent)}
+#repPanel small.note{opacity:.75;color:inherit;font-size:.85rem}
+#repPresets{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#repPresets button.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+#repPanel .line2{display:flex;align-items:center;gap:8px;margin-top:10px;line-height:1.5}
+#repN{width:80px;text-align:center}
+#repPanel .big{flex:1;padding:8px}
+#repStat{margin-top:10px;min-height:1.6em;font-weight:bold}
 #vp{position:fixed;top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;margin:auto;max-width:560px;z-index:50;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px 12px 44px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 #vp.show{display:block}
 #vp .x{position:absolute;z-index:1;top:8px;left:8px;padding:2px 9px}
@@ -134,7 +147,7 @@ body.tj #legend.show{display:block}
   <button id="openList" title="السور">☰</button>
   <span id="lbl"></span>
   <span class="grp">
-    <button id="fMinus">A−</button><button id="fPlus">A+</button><button id="theme">◐</button>
+    <button id="repBtn" title="تكرار الآيات" aria-expanded="false">🔁 تكرار</button><button id="fMinus">A−</button><button id="fPlus">A+</button><button id="theme">◐</button>
   </span>
 </header>
 
@@ -166,6 +179,20 @@ body.tj #legend.show{display:block}
     <div id="ans"></div>
     <small class="note">إجابة آلية مبنية على تفسير الميسر فقط، وقد تخطئ. للفتاوى راجع أهل العلم.</small>
   </div>
+</section>
+
+<section id="repPanel" aria-label="تكرار الآيات">
+  <div class="row"><b>تكرار الآيات</b><button id="repX" title="إغلاق">✕</button></div>
+  <small>عدد مرات تكرار كل آية</small>
+  <div id="repPresets">
+    <button data-n="1">بدون</button><button data-n="3">٣</button><button data-n="5">٥</button>
+    <button data-n="10">١٠</button><button data-n="20">٢٠</button><button data-n="50">٥٠</button>
+  </div>
+  <label class="line2">عدد آخر: <input id="repN" type="number" min="1" max="999" inputmode="numeric"></label>
+  <label class="line2"><input id="repNext" type="checkbox"> الانتقال تلقائياً إلى الآية التالية بعد انتهاء التكرار</label>
+  <div id="repStat" role="status" aria-live="polite"></div>
+  <div class="row"><button id="repPlay" class="big">▶ تشغيل التكرار</button><button id="repStop" class="big">■ إيقاف</button></div>
+  <small class="note">يبدأ من الآية المحددة، أو من أول آية في الصفحة. يعمل مع جميع القرّاء.</small>
 </section>
 
 <div id="vp" role="status" aria-live="polite"><button class="x" id="vx" title="إغلاق">✕</button><div class="you" id="vyou"></div><div class="bot" id="vbot"></div></div>
