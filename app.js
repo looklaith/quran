@@ -151,30 +151,41 @@ const go = d => loadPage(S.page + d);
 // font size and shrink the text only as much as needed.
 function fitPage() {
   const box = $('text'), page = $('page'), reader = $('reader');
+  const ls = [...box.querySelectorAll('.line')];
+  const measure = () => {                       // natural (unstretched) width of every line
+    box.classList.add('measure');
+    const w = ls.map(l => l.offsetWidth);
+    box.classList.remove('measure');
+    return w;
+  };
   box.style.fontSize = ''; page.style.maxWidth = ''; page.style.minHeight = '0';
-  box.classList.add('measure');
-  let widest = 0;
-  const ls = [...box.querySelectorAll('.line')], widths = ls.map(l => l.offsetWidth);
-  widths.forEach(w => { widest = Math.max(widest, w); });
-  box.classList.remove('measure');
+  const widths = measure(), widest = Math.max(0, ...widths);
   // A line with only a few words (e.g. the end of An-Nas) would get huge gaps if stretched to the
   // full width; the printed Mushaf lengthens letters instead, which browsers cannot do. Centre it.
   ls.forEach((l, i) => l.classList.toggle('short', widths[i] < widest * 0.65));
   const room = box.clientWidth;
-  if (!widest) { page.style.minHeight = ''; return; }
+  if (!widest || room < 50) { page.style.minHeight = ''; return; }   // not laid out yet
   const frameW = page.offsetWidth - room;
-  let size = fs * Math.min(1, room / widest * 0.98);                 // fit the width
+  const widthSize = fs * Math.min(1, room / widest * 0.98);           // fit the width
+  let size = widthSize;
   box.style.fontSize = size.toFixed(3) + 'rem';
-  // Fit the height: only the text scales; header, footer and frame stay the same size.
+  // Fit the height too, so the whole page is on screen: only the text scales; header, footer and
+  // frame stay the same size. On a very short screen (a phone held sideways) that would make the
+  // text too small to read, so there the page keeps the width size and scrolls instead.
   const avail = reader.clientHeight - 8;
-  for (let n = 0; n < 3 && page.offsetHeight > avail; n++) {
-    const textH = box.offsetHeight, fixedH = page.offsetHeight - textH;
-    size *= Math.max(0.3, (avail - fixedH) / textH) * 0.99;
+  if (avail > 200) {
+    for (let n = 0; n < 3 && page.offsetHeight > avail; n++) {
+      const textH = box.offsetHeight, fixedH = page.offsetHeight - textH;
+      size *= Math.max(0.3, (avail - fixedH) / textH) * 0.99;
+      box.style.fontSize = size.toFixed(3) + 'rem';
+    }
+    if (size < widthSize * 0.6) size = widthSize;
     box.style.fontSize = size.toFixed(3) + 'rem';
   }
   page.style.minHeight = '';
   // On wide screens the page is only as wide as its longest line, like a printed page.
-  const w = Math.ceil(widest * size / fs * 1.04 + frameW);
+  // Measured again at the final size, so the frame can never be narrower than the text.
+  const w = Math.ceil(Math.max(...measure()) * 1.04 + frameW);
   if (w < page.offsetWidth) page.style.maxWidth = w + 'px';
 }
 let fitTimer;
