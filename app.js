@@ -188,8 +188,19 @@ function fitPage() {
   const w = Math.ceil(Math.max(...measure()) * 1.04 + frameW);
   if (w < page.offsetWidth) page.style.maxWidth = w + 'px';
 }
+// Re-fit whenever the reading area really changes size (rotating the phone, browser bars showing or
+// hiding). iPhone Safari reports the new size late after a rotation, so also re-fit a moment later.
 let fitTimer;
-addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitPage, 100); });
+const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitPage, 100); };
+addEventListener('resize', refit);
+addEventListener('orientationchange', () => { refit(); setTimeout(fitPage, 500); setTimeout(fitPage, 1200); });
+if (window.ResizeObserver) {
+  let lastW = 0, lastH = 0;
+  new ResizeObserver(([e]) => {
+    const { width, height } = e.contentRect;
+    if (Math.abs(width - lastW) > 1 || Math.abs(height - lastH) > 1) { lastW = width; lastH = height; refit(); }
+  }).observe($('reader'));
+}
 if (document.fonts) document.fonts.ready.then(fitPage);
 
 // ---------- Tap handling ----------
