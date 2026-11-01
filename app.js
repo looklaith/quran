@@ -630,7 +630,21 @@ $('vx').onclick = () => {
 
 // ---------- Offline / install ----------
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+  // An iPhone home-screen app is usually resumed from memory, not reloaded, so it would keep
+  // showing the old version. Look for a new version every time the app comes back on screen,
+  // and reload once when it is installed (not while a recitation is playing).
+  const hadWorker = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadWorker || reloading || (S.audio && !S.audio.paused)) return;
+    reloading = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').then(reg => {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }));
 }
 // Keep the chosen translation on the phone too (the Quran text and tafsir are saved when the app installs).
 $('trSel').addEventListener('change', () => edition($('trSel').value).catch(() => {}));
