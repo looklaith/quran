@@ -56,6 +56,32 @@ const tjCache = {};
 // the Mushaf words are the same words. Yeh and hamza are left out: the two sources write them in
 // different ways (e.g. هَدَىٰكُمۡ), which is spelling, not a different word.
 const bareLetters = s => s.replace(/<[^>]+>/g, '').replace(/[^آ-ؿف-ىيٱ-ۓ]|[يىیء]/g, '');
+// iPhone Safari stops joining two letters where a colour starts or ends, so a word like يَعۡقِلُونَ
+// falls apart into ى عقلون. A zero-width joiner on both sides of the colour change keeps the two
+// letters joined. Added only where they really join: the letter before joins forward (not ا د ذ ر ز و)
+// and the next character is a letter (a colour change before a vowel mark is left as it is).
+const ZWJ_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', ZWJ_MARK = /[ً-ٰٟۖ-ۭ]/,
+      ZWJ_NEXT = /[آ-يٱ-ۓ]/;
+function joinAcrossTags(html) {
+  const out = [];
+  let lastBase = null, pending = -1;                 // pending: where the tag(s) of a colour change start in `out`
+  for (const part of html.split(/(<[^>]+>)/)) {
+    if (!part) continue;
+    if (part[0] === '<') { if (pending < 0) pending = out.length; out.push(part); continue; }
+    for (const ch of part) {
+      if (pending >= 0 && !ZWJ_MARK.test(ch)) {
+        if (ZWJ_NEXT.test(ch) && lastBase && ZWJ_JOIN.includes(lastBase)) {
+          out.splice(pending, 0, '‍');
+          out.push('‍');
+        }
+      }
+      pending = -1;
+      out.push(ch);
+      if (ch === ' ') lastBase = null; else if (!ZWJ_MARK.test(ch)) lastBase = ch;
+    }
+  }
+  return out.join('');
+}
 function tajweed(p) {
   if (!tjCache[p]) {
     tjCache[p] = fetch('https://api.quran.com/api/v4/verses/by_page/' + p + '?words=true&per_page=50&word_fields=text_uthmani_tajweed,line_number')
@@ -128,7 +154,7 @@ async function loadPage(p, opts = {}) {
           if (acc.length && /^[ۖ-ۭ]+$/.test(w)) acc[acc.length - 1] += ' ' + w; else acc.push(w);
           return acc;
         }, []);
-        tw = tw.map((w, j) => qw[j] && qw[j].includes('ۤ') ? `<span class="ovl">${w}</span>` : w).join(' ');
+        tw = tw.map((w, j) => { w = joinAcrossTags(w); return qw[j] && qw[j].includes('ۤ') ? `<span class="ovl">${w}</span>` : w; }).join(' ');
       }
       const t = (tw || esc(words)).replace(/ ([ۖ-ۜ]+)(?= |$)/g, '$1');
       // Al-Fatihah: ayah 1 IS the Bismillah; it stays unnumbered and the numbering shifts by one.
