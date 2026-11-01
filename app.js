@@ -146,20 +146,32 @@ async function loadPage(p, opts = {}) {
 }
 const go = d => loadPage(S.page + d);
 
-// Every line must fit the screen without wrapping (that would break the Mushaf layout).
-// Measure the widest line at the chosen font size and shrink the text only as much as needed.
+// The whole page must fit on the screen, like a printed page: every line fits the width without
+// wrapping (that would break the Mushaf layout) and all lines fit the height. Measure at the chosen
+// font size and shrink the text only as much as needed.
 function fitPage() {
-  // On wide screens the page is only as wide as its longest line, like a printed page.
-  const box = $('text'), page = $('page');
-  box.style.fontSize = ''; page.style.maxWidth = '';
+  const box = $('text'), page = $('page'), reader = $('reader');
+  box.style.fontSize = ''; page.style.maxWidth = ''; page.style.minHeight = '0';
   box.classList.add('measure');
   let widest = 0;
   box.querySelectorAll('.line').forEach(l => { widest = Math.max(widest, l.offsetWidth); });
   box.classList.remove('measure');
   const room = box.clientWidth;
-  if (!widest) return;
-  if (widest > room) box.style.fontSize = (fs * room / widest * 0.98).toFixed(3) + 'rem';
-  else page.style.maxWidth = Math.ceil(widest * 1.04 + page.offsetWidth - room) + 'px';
+  if (!widest) { page.style.minHeight = ''; return; }
+  const frameW = page.offsetWidth - room;
+  let size = fs * Math.min(1, room / widest * 0.98);                 // fit the width
+  box.style.fontSize = size.toFixed(3) + 'rem';
+  // Fit the height: only the text scales; header, footer and frame stay the same size.
+  const avail = reader.clientHeight - 8;
+  for (let n = 0; n < 3 && page.offsetHeight > avail; n++) {
+    const textH = box.offsetHeight, fixedH = page.offsetHeight - textH;
+    size *= Math.max(0.3, (avail - fixedH) / textH) * 0.99;
+    box.style.fontSize = size.toFixed(3) + 'rem';
+  }
+  page.style.minHeight = '';
+  // On wide screens the page is only as wide as its longest line, like a printed page.
+  const w = Math.ceil(widest * size / fs * 1.04 + frameW);
+  if (w < page.offsetWidth) page.style.maxWidth = w + 'px';
 }
 let fitTimer;
 addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitPage, 100); });
