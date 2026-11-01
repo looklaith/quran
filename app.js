@@ -489,9 +489,26 @@ const TURNS = ['flip', 'slide', 'scroll'], TURN_ANIMS = ['slide-next', 'slide-pr
 function setTurn(t) {
   S.turn = TURNS.includes(t) ? t : 'flip';
   $('turnSel').value = S.turn;
+  $('turnBtn').textContent = TURN_ICONS[S.turn];
+  $('turnBtn').title = 'تقليب الصفحات: ' + TURN_NAMES[S.turn];
   store.set('turn', S.turn);
 }
+const TURN_ICONS = { flip: '📖', slide: '↔', scroll: '↕' },
+      TURN_NAMES = { flip: 'قلب الصفحة', slide: 'سحب يمين / يسار', scroll: 'تمرير لأسفل' };
 $('turnSel').onchange = () => setTurn($('turnSel').value);
+// Top-bar button: each tap moves to the next way, and says which one is now on.
+let turnMsgTimer;
+$('turnBtn').onclick = () => {
+  setTurn(TURNS[(TURNS.indexOf(S.turn) + 1) % TURNS.length]);
+  const lbl = $('lbl'), old = lbl.dataset.old ?? lbl.textContent;
+  lbl.dataset.old = old;
+  const msg = lbl.textContent = TURN_ICONS[S.turn] + ' ' + TURN_NAMES[S.turn];
+  clearTimeout(turnMsgTimer);
+  turnMsgTimer = setTimeout(() => {          // put the page name back, unless a new page already did
+    if (lbl.textContent === msg) lbl.textContent = lbl.dataset.old;
+    delete lbl.dataset.old;
+  }, 1500);
+};
 function endTurnAnim() {
   $('page').classList.remove(...TURN_ANIMS);
   $('reader').classList.remove('anim');
