@@ -95,6 +95,15 @@ async function loadPage(p, opts = {}) {
   // Draw the page line by line, exactly as the printed Mushaf. An ayah split over lines becomes
   // several spans with the same data-i, so tapping, highlighting and audio treat them as one ayah.
   const base = ayahs[0].number;
+  // In lines.json some ayah-number circles (566 of them) sit alone at the start of the next line,
+  // which leaves a number and a wide gap at the start of a line. As in print, put the number at the end
+  // of the line above, where its ayah ends. Line positions stay the same for the tajweed lookup.
+  lines = lines.map(ln => Array.isArray(ln[0]) ? ln.map(s => s.slice()) : ln);
+  lines.forEach((ln, L) => {
+    if (!Array.isArray(ln[0]) || ln[0][1] !== '' || !ln[0][2] || !L) return;
+    const prev = lines[L - 1], last = Array.isArray(prev[0]) && prev[prev.length - 1];
+    if (last && last[0] === ln[0][0]) { last[2] = 1; ln.shift(); }
+  });
   let h = '';
   lines.forEach((ln, L) => {
     if (ln[0] === 'h') { h += `<div class="line sura">${esc(surahs[ln[1] - 1].name)}</div>`; return; }
@@ -152,6 +161,10 @@ const go = d => loadPage(S.page + d);
 function fitPage() {
   const box = $('text'), page = $('page'), reader = $('reader');
   const ls = [...box.querySelectorAll('.line')];
+  ls.forEach(l => {
+    l.style.fontSize = ''; l.style.lineHeight = '';
+    if (l._kd) { l._kd.forEach(([n, d]) => { n.data = d; }); l._kd = null; }   // undo kashida
+  });
   const measure = () => {                       // natural (unstretched) width of every line
     box.classList.add('measure');
     const w = ls.map(l => l.offsetWidth);
@@ -187,6 +200,78 @@ function fitPage() {
   // Measured again at the final size, so the frame can never be narrower than the text.
   const w = Math.ceil(Math.max(...measure()) * 1.04 + frameW);
   if (w < page.offsetWidth) page.style.maxWidth = w + 'px';
+  // Close the gaps: a line a little shorter than the page would get all the extra room as wide
+  // spaces between words and ayahs. Enlarge its words slightly instead (at most 15%), so the gaps
+  // stay small; line-height is reduced by the same amount so the page height does not change.
+  if (box.classList.contains('opening')) return;
+  const full = box.clientWidth * 0.995, nat = measure();
+  ls.forEach((l, i) => {
+    if (l.matches('.short,.sura,.bism') || !nat[i]) return;
+    const k = Math.min(1.15, full / nat[i]);
+    if (k > 1.005) { l.style.fontSize = k.toFixed(3) + 'em'; l.style.lineHeight = (2.05 / k).toFixed(3); }
+  });
+  // A line still clearly short gets the rest the way the printed Mushaf does it: kashida (ـ)
+  // lengthens the joins between letters, one stretch near the end of each word.
+  const after = measure();
+  ls.forEach((l, i) => {
+    if (l.matches('.short,.sura,.bism') || !after[i] || full - after[i] < full * 0.02) return;
+    kashida(l, full - after[i]);
+  });
+}
+// Letters that join to the next letter, combining marks, and letters that can be joined to.
+const KD_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', KD_MARK = /[ً-ٰٟۖ-ۭ]/,
+      KD_NEXT = /[آ-يٱ-ۓ]/;
+function kashida(line, room) {
+  // Width of one kashida at this line's size.
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap';
+  probe.textContent = 'ـــــــــــــــــــ';
+  line.appendChild(probe);
+  const kw = probe.offsetWidth / 10;
+  probe.remove();
+  if (!kw) return;
+  // One place per word: the last join in it (never between lam and alef, which form one ligature).
+  const spots = [];
+  const walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walk.nextNode());) {
+    if (n.parentNode.closest('.num')) continue;
+    const s = n.data;
+    let last = -1;
+    for (let i = 0; i <= s.length; i++) {
+      if (i === s.length || s[i] === ' ') {
+        // Never stretch the name of Allah (its letters form one special ligature).
+        const word = s.slice(s.lastIndexOf(' ', i - 1) + 1, i).replace(new RegExp(KD_MARK.source, 'g'), '');
+        if (last >= 0 && !word.includes('لله')) spots.push([n, last]);
+        last = -1; continue;
+      }
+      if (!KD_JOIN.includes(s[i])) continue;
+      let j = i + 1;
+      while (j < s.length && KD_MARK.test(s[j])) j++;
+      if (j < s.length && KD_NEXT.test(s[j]) && !(s[i] === 'ل' && 'اأإآٱله'.includes(s[j]))) last = j;
+    }
+  }
+  if (!spots.length) return;
+  const box = line.parentNode, start = (box.classList.add('measure'), line.offsetWidth);
+  box.classList.remove('measure');
+  const limit = start + room;                  // the line may grow by `room`, never more
+  // Insert from the end of each text node backwards so earlier positions stay valid; keep the
+  // original text so a re-fit (rotating the phone) starts from clean text.
+  const orig = new Map(spots.map(([n]) => [n, n.data]));
+  let need = Math.floor(room * 0.9 / kw);
+  for (let tries = 0; tries < 4 && need >= 1; tries++) {
+    // Spread evenly over the words, at most 4 per word.
+    const count = spots.map((_, i) => Math.min(4, Math.floor(need * (i + 1) / spots.length) - Math.floor(need * i / spots.length)));
+    for (let i = spots.length - 1; i >= 0; i--) {
+      const [n, at] = spots[i];
+      if (count[i]) n.data = n.data.slice(0, at) + 'ـ'.repeat(count[i]) + n.data.slice(at);
+    }
+    box.classList.add('measure');
+    const w = line.offsetWidth;
+    box.classList.remove('measure');
+    if (w <= limit) { line._kd = [...orig]; return; }
+    orig.forEach((d, n) => { n.data = d; });  // a little too wide: undo and try with fewer
+    need = Math.floor(need * 0.75);
+  }
 }
 // Re-fit whenever the reading area really changes size (rotating the phone, browser bars showing or
 // hiding). iPhone Safari reports the new size late after a rotation, so also re-fit a moment later.
