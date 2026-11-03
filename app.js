@@ -111,29 +111,94 @@ function tajweed(p) {
   }
   return tjCache[p];
 }
-// Translation / tafsir rows for one page, in the same order as the page's ayahs.
-const extra = async (p, ed) => {
-  const [list, page] = await Promise.all([edition(ed), quran(p)]);
-  return page.map(a => ({ text: list[a.number - 1] }));
-};
-
 // ---------- Page loading ----------
+// Laptop / desktop (a wide screen held sideways): an open book with two pages, odd page on the right
+// and even page on the left, as in the printed Mushaf. Phones show one page.
+const isWide = () => innerWidth >= 900 && innerHeight >= 500 && innerWidth > innerHeight * 1.2;
+const bookPages = () => [...$('book').children].filter(e => e.classList.contains('page'));
+async function pageData(p, tjOn) {
+  const [ayahs, lines, { surahs }] = await Promise.all([quran(p), layout(p), db()]);
+  let tj = null;
+  if (tjOn) { try { tj = await tajweed(p); } catch (e) { tj = null; } }
+  return { p, ayahs, lines, surahs, tj };
+}
 async function loadPage(p, opts = {}) {
   p = Math.max(1, Math.min(604, p));
+  const spread = isWide();
+  if (spread && p % 2 === 0) p--;              // a spread always starts on its odd (right) page
+  if (p === S.page && spread === S.spread && S.ayahs.length && !opts.noAnim && !opts.play) return;
   const dir = p >= S.page ? 'next' : 'prev';
   const id = ++S.loadId;          // newest request wins, so fast clicks never mix pages
   stopAudio();
-  let ayahs, lines, surahs, tj = null;
-  try {
-    [ayahs, lines, { surahs }] = await Promise.all([quran(p), layout(p), db()]);
-    if (document.body.classList.contains('tj')) { try { tj = await tajweed(p); } catch (e) { tj = null; } }
-  }
-  catch (e) { if (id === S.loadId) $('text').innerHTML = '<div class="msg">⚠️ تعذّر التحميل. تحقق من الإنترنت.</div>'; return; }
+  const nums = spread ? [p, p + 1] : [p];
+  let data;
+  try { data = await Promise.all(nums.map(n => pageData(n, document.body.classList.contains('tj')))); }
+  catch (e) { if (id === S.loadId) $('book').innerHTML = '<div class="page"><div class="text"><div class="msg">⚠️ تعذّر التحميل. تحقق من الإنترنت.</div></div></div>'; return; }
   if (id !== S.loadId) return;
 
-  S.page = p; S.ayahs = ayahs; S.sel = -1;
-  // Draw the page line by line, exactly as the printed Mushaf. An ayah split over lines becomes
-  // several spans with the same data-i, so tapping, highlighting and audio treat them as one ayah.
+  // Page turns play even with "reduce motion" on: the reader picks the turn style (📖) in the menu.
+  const animate = !opts.noAnim;
+  // For the book page-turn: a copy of the two pages that are on screen now, taken before they change.
+  const old = animate && spread && S.spread && S.turn === 'flip' ? bookPages().map(e => ({ el: e.cloneNode(true), r: e.getBoundingClientRect() })) : null;
+  S.page = p; S.spread = spread; S.ayahs = data.flatMap(d => d.ayahs); S.sel = -1;
+  const book = $('book');
+  book.classList.toggle('spread', spread);
+  let off = 0;
+  book.innerHTML = data.map(d => { const h = pageHTML(d, off); off += d.ayahs.length; return h; }).join('');
+  fitPage();
+  // Scrolling back up lands at the bottom of the previous page (matters only when a page scrolls).
+  $('reader').scrollTop = S.turn === 'scroll' && dir === 'prev' && !opts.noAnim ? 1e6 : 0;
+  if (animate) {
+    if (S.turn === 'flip' && spread) { if (old && old.length === 2) bookFlip(old, dir); }
+    else if (S.turn === 'flip') {
+      const box = book.querySelector('.text');
+      void box.offsetWidth;                 // restart the animation
+      box.classList.add('in-' + dir);
+    } else {                                // the whole page slides in sideways, or from below / above
+      book.classList.remove(...TURN_ANIMS);
+      void book.offsetWidth;
+      $('reader').classList.add('anim');    // no scrollbars while the page moves
+      book.classList.add(S.turn + '-' + dir);
+      clearTimeout(S.turnTimer);
+      S.turnTimer = setTimeout(endTurnAnim, 600);   // in case the animation-end event never comes
+    }
+  }
+  const first = S.ayahs[0];
+  $('pg').value = p;
+  $('lbl').textContent = `${first.surah.name} · الجزء ${ar(first.juz)} · صفحة ${ar(p)}${spread ? '–' + ar(p + 1) : ''}`;
+  closeSheet();
+  store.set('lastPage', p);
+  if (opts.play) playFrom(0);
+}
+const go = d => loadPage(S.page + d * (S.spread ? 2 : 1));
+
+// The open book turns like paper. Next: the left page lifts at the spine and turns over to the right,
+// showing the new right page on its back while the new left page appears under it. Previous: the
+// right page turns over to the left. Copies of the pages are animated above the real ones.
+function bookFlip(old, dir) {
+  const fx = $('flip'), now = bookPages().map(e => ({ el: e.cloneNode(true), r: e.getBoundingClientRect() }));
+  const [stay, lift, under] = dir === 'next' ? [old[0], old[1], now[0]] : [old[1], old[0], now[1]];
+  const box = (r, cls) => {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+    return d;
+  };
+  const face = (pg, cls) => { const f = document.createElement('div'); f.className = 'face ' + cls; f.appendChild(pg); return f; };
+  const still = box(stay.r); still.style.display = 'flex'; still.appendChild(stay.el);
+  const leaf = box(lift.r, 'leaf ' + dir);
+  leaf.append(face(lift.el, 'front'), face(under.el, 'back'));
+  clearTimeout(S.flipTimer);
+  fx.replaceChildren(still, leaf);
+  const done = () => { clearTimeout(S.flipTimer); fx.replaceChildren(); };
+  leaf.addEventListener('animationend', done, { once: true });
+  S.flipTimer = setTimeout(done, 1200);          // in case the animation-end event never comes
+}
+
+// Draw one page line by line, exactly as the printed Mushaf. An ayah split over lines becomes
+// several spans with the same data-i, so tapping, highlighting and audio treat them as one ayah.
+// `off` is where this page's ayahs start in S.ayahs (the right page comes first in a spread).
+function pageHTML({ p, ayahs, lines, surahs, tj }, off) {
   const base = ayahs[0].number;
   // In lines.json some ayah-number circles (566 of them) sit alone at the start of the next line,
   // which leaves a number and a wide gap at the start of a line. As in print, put the number at the end
@@ -174,103 +239,94 @@ async function loadPage(p, opts = {}) {
       const sajda = a.text.includes('۩') ? ' sajda' : '';
       // The tajweed text leaves out the ۩ sign, so put it back at the end of a sajdah verse.
       const mark = sajda && end && !t.includes('۩') ? ' ۩' : '';
-      return `<span class="ayah${sajda}" data-i="${i}">${t}${mark}${num}</span>`;
+      return `<span class="ayah${sajda}" data-i="${off + i}">${t}${mark}${num}</span>`;
     }).join(' ') + '</div>';
   });
-  const box = $('text');
-  box.className = p <= 2 ? 'opening' : '';
-  box.innerHTML = h;
-  fitPage();
-  // Scrolling back up lands at the bottom of the previous page (matters only when a page scrolls).
-  $('reader').scrollTop = S.turn === 'scroll' && dir === 'prev' && !opts.noAnim ? 1e6 : 0;
-  if (!opts.noAnim && !matchMedia('(prefers-reduced-motion:reduce)').matches) {
-    if (S.turn === 'flip') {
-      void box.offsetWidth;                 // restart the animation
-      box.classList.add('in-' + dir);
-    } else {                                // the whole page slides in sideways, or from below / above
-      const pg = $('page');
-      pg.classList.remove(...TURN_ANIMS);
-      void pg.offsetWidth;
-      $('reader').classList.add('anim');    // no scrollbars while the page moves
-      pg.classList.add(S.turn + '-' + dir);
-      clearTimeout(S.turnTimer);
-      S.turnTimer = setTimeout(endTurnAnim, 600);   // in case the animation-end event never comes
-    }
-  }
   // Page header and footer, as printed: surah of the page, juz in words, page number.
-  $('hSura').textContent = 'سُورَةُ ' + ayahs[0].surah.name.replace(/^سُورَةُ\s*/, '');
-  $('hJuz').textContent = 'الجُزْءُ ' + JUZ[ayahs[0].juz - 1];
-  $('hPage').textContent = ar(p);
-  $('pg').value = p;
-  $('lbl').textContent = `${ayahs[0].surah.name} · الجزء ${ar(ayahs[0].juz)} · صفحة ${ar(p)}`;
-  closeSheet();
-  store.set('lastPage', p);
-  if (opts.play) playFrom(0);
+  const sura = 'سُورَةُ ' + ayahs[0].surah.name.replace(/^سُورَةُ\s*/, ''), juz = 'الجُزْءُ ' + JUZ[ayahs[0].juz - 1];
+  return `<div class="page"><div class="phead"><span>${esc(sura)}</span><span>${esc(juz)}</span></div>` +
+    `<div class="text${p <= 2 ? ' opening' : ''}">${h}</div><div class="pfoot"><span class="hPage">${ar(p)}</span></div></div>`;
 }
-const go = d => loadPage(S.page + d);
 
 // The whole page must fit on the screen, like a printed page: every line fits the width without
 // wrapping (that would break the Mushaf layout) and all lines fit the height. Measure at the chosen
 // font size and shrink the text only as much as needed.
+// In the two-page book both pages get the same text size, as large as the screen allows: the
+// whole spread fills the screen height. A+ / A− make it larger or smaller from there.
+const BASE_FS = 1.9;
 function fitPage() {
-  const box = $('text'), page = $('page'), reader = $('reader');
-  const ls = [...box.querySelectorAll('.line')];
-  ls.forEach(l => {
+  const book = $('book'), reader = $('reader');
+  const parts = bookPages().map(pg => ({ pg, box: pg.querySelector('.text'), ls: [...pg.querySelectorAll('.line')] }))
+    .filter(x => x.box && x.ls.length);
+  if (!parts.length) return;
+  const spread = parts.length > 1;
+  parts.forEach(x => x.ls.forEach(l => {
     l.style.fontSize = ''; l.style.lineHeight = '';
     if (l._kd) { l._kd.forEach(([n, d]) => { n.data = d; }); l._kd = null; }   // undo kashida
-  });
-  const measure = () => {                       // natural (unstretched) width of every line
-    box.classList.add('measure');
-    const w = ls.map(l => l.offsetWidth);
-    box.classList.remove('measure');
+  }));
+  const measure = x => {                        // natural (unstretched) width of every line
+    x.box.classList.add('measure');
+    const w = x.ls.map(l => l.offsetWidth);
+    x.box.classList.remove('measure');
     return w;
   };
-  box.style.fontSize = ''; page.style.maxWidth = ''; page.style.minHeight = '0';
-  const widths = measure(), widest = Math.max(0, ...widths);
-  // A line with only a few words (e.g. the end of An-Nas) would get huge gaps if stretched to the
-  // full width; the printed Mushaf lengthens letters instead, which browsers cannot do. Centre it.
-  ls.forEach((l, i) => l.classList.toggle('short', widths[i] < widest * 0.65));
-  const room = box.clientWidth;
-  if (!widest || room < 50) { page.style.minHeight = ''; return; }   // not laid out yet
-  const frameW = page.offsetWidth - room;
-  const widthSize = fs * Math.min(1, room / widest * 0.98);           // fit the width
+  parts.forEach(x => { x.box.style.fontSize = ''; x.pg.style.maxWidth = ''; });
+  book.style.minHeight = '0';
+  let widthSize = Infinity, frameW = 0;
+  for (const x of parts) {
+    const widths = measure(x), widest = Math.max(0, ...widths);
+    // A line with only a few words (e.g. the end of An-Nas) would get huge gaps if stretched to the
+    // full width; the printed Mushaf lengthens letters instead, which browsers cannot do. Centre it.
+    x.ls.forEach((l, i) => l.classList.toggle('short', widths[i] < widest * 0.65));
+    const room = x.box.clientWidth;
+    if (!widest || room < 50) { book.style.minHeight = ''; return; }   // not laid out yet
+    frameW = x.pg.offsetWidth - room;
+    const k = room / widest * 0.98;                                   // fit the width
+    widthSize = Math.min(widthSize, fs * (spread ? k : Math.min(1, k)));
+  }
   let size = widthSize;
-  box.style.fontSize = size.toFixed(3) + 'rem';
+  const setSize = s => parts.forEach(x => { x.box.style.fontSize = s.toFixed(3) + 'rem'; });
+  const tallest = () => parts.reduce((a, b) => (b.pg.offsetHeight > a.pg.offsetHeight ? b : a));
+  setSize(size);
   // Fit the height too, so the whole page is on screen: only the text scales; header, footer and
   // frame stay the same size. On a very short screen (a phone held sideways) that would make the
   // text too small to read, so there the page keeps the width size and scrolls instead.
   const avail = reader.clientHeight - 8;
   if (avail > 200) {
-    for (let n = 0; n < 3 && page.offsetHeight > avail; n++) {
-      const textH = box.offsetHeight, fixedH = page.offsetHeight - textH;
+    for (let n = 0; n < 3 && tallest().pg.offsetHeight > avail; n++) {
+      const x = tallest(), textH = x.box.offsetHeight, fixedH = x.pg.offsetHeight - textH;
       size *= Math.max(0.3, (avail - fixedH) / textH) * 0.99;
-      box.style.fontSize = size.toFixed(3) + 'rem';
+      setSize(size);
     }
-    if (size < widthSize * 0.6) size = widthSize;
-    box.style.fontSize = size.toFixed(3) + 'rem';
+    if (spread) size = Math.min(widthSize, size * fs / BASE_FS);
+    else if (size < widthSize * 0.6) size = widthSize;
+    setSize(size);
   }
-  page.style.minHeight = '';
+  book.style.minHeight = '';
   // On wide screens the page is only as wide as its longest line, like a printed page.
   // Measured again at the final size, so the frame can never be narrower than the text.
-  const w = Math.ceil(Math.max(...measure()) * 1.04 + frameW);
-  if (w < page.offsetWidth) page.style.maxWidth = w + 'px';
-  // Close the gaps: a line a little shorter than the page would get all the extra room as wide
-  // spaces between words and ayahs. Enlarge its words slightly instead (at most 15%), so the gaps
-  // stay small; line-height is reduced by the same amount so the page height does not change.
-  if (box.classList.contains('opening')) return;
-  const full = box.clientWidth * 0.995, nat = measure();
-  ls.forEach((l, i) => {
-    if (l.matches('.short,.sura,.bism') || !nat[i]) return;
-    const k = Math.min(1.15, full / nat[i]);
-    if (k > 1.005) { l.style.fontSize = k.toFixed(3) + 'em'; l.style.lineHeight = (2.05 / k).toFixed(3); }
-  });
-  // A line still clearly short gets the rest the way the printed Mushaf does it: kashida (ـ)
-  // lengthens the joins between letters, one stretch near the end of each word.
-  const after = measure();
-  ls.forEach((l, i) => {
-    if (l.matches('.short,.sura,.bism') || !after[i] || full - after[i] < full * 0.02) return;
-    kashida(l, full - after[i]);
-  });
+  // Both pages of a spread get the same width, so the spine stays in the middle.
+  const w = Math.ceil(Math.max(...parts.map(x => Math.max(...measure(x)))) * 1.04 + frameW);
+  parts.forEach(x => { if (w < x.pg.offsetWidth) x.pg.style.maxWidth = w + 'px'; });
+  for (const x of parts) {
+    // Close the gaps: a line a little shorter than the page would get all the extra room as wide
+    // spaces between words and ayahs. Enlarge its words slightly instead (at most 15%), so the gaps
+    // stay small; line-height is reduced by the same amount so the page height does not change.
+    if (x.box.classList.contains('opening')) continue;
+    const full = x.box.clientWidth * 0.995, nat = measure(x);
+    x.ls.forEach((l, i) => {
+      if (l.matches('.short,.sura,.bism') || !nat[i]) return;
+      const k = Math.min(1.15, full / nat[i]);
+      if (k > 1.005) { l.style.fontSize = k.toFixed(3) + 'em'; l.style.lineHeight = (2.05 / k).toFixed(3); }
+    });
+    // A line still clearly short gets the rest the way the printed Mushaf does it: kashida (ـ)
+    // lengthens the joins between letters, one stretch near the end of each word.
+    const after = measure(x);
+    x.ls.forEach((l, i) => {
+      if (l.matches('.short,.sura,.bism') || !after[i] || full - after[i] < full * 0.02) return;
+      kashida(l, full - after[i]);
+    });
+  }
 }
 // Letters that join to the next letter, combining marks, and letters that can be joined to.
 const KD_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', KD_MARK = /[ً-ٰٟۖ-ۭ]/,
@@ -330,7 +386,11 @@ function kashida(line, room) {
 // Re-fit whenever the reading area really changes size (rotating the phone, browser bars showing or
 // hiding). iPhone Safari reports the new size late after a rotation, so also re-fit a moment later.
 let fitTimer;
-const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitPage, 100); };
+// When the window becomes wide enough for the open book (or too narrow for it), redraw as one / two pages.
+const refit = () => {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(() => { if (S.ayahs.length && isWide() !== !!S.spread) loadPage(S.page, { noAnim: true }); else fitPage(); }, 100);
+};
 addEventListener('resize', refit);
 addEventListener('orientationchange', () => { refit(); setTimeout(fitPage, 500); setTimeout(fitPage, 1200); });
 if (window.ResizeObserver) {
@@ -353,8 +413,8 @@ $('reader').addEventListener('click', e => {
 
 function selectAyah(i) {
   S.sel = i;
-  document.querySelectorAll('.ayah.sel').forEach(e => e.classList.remove('sel'));
-  document.querySelectorAll(`.ayah[data-i="${i}"]`).forEach(e => e.classList.add('sel'));
+  $('book').querySelectorAll('.ayah.sel').forEach(e => e.classList.remove('sel'));
+  $('book').querySelectorAll(`.ayah[data-i="${i}"]`).forEach(e => e.classList.add('sel'));
   const a = S.ayahs[i];
   $('ref').textContent = a.surah.number === 1 && a.numberInSurah === 1 ? `${a.surah.name} · البسملة` : `${a.surah.name} ﴿${ar(shownNo(a))}﴾`;
   $('sheet').classList.add('open');
@@ -363,7 +423,7 @@ function selectAyah(i) {
 }
 function closeSheet() {
   $('sheet').classList.remove('open');
-  document.querySelectorAll('.ayah.sel').forEach(e => e.classList.remove('sel'));
+  $('book').querySelectorAll('.ayah.sel').forEach(e => e.classList.remove('sel'));
   S.sel = -1;
 }
 async function fill(i) {
@@ -371,8 +431,9 @@ async function fill(i) {
   $('tr').textContent = ed === 'none' ? '' : '…';
   $('tr').dir = ed === 'ur.jalandhry' ? 'rtl' : 'ltr';
   $('tf').textContent = '…';
-  const put = async (el, edition) => {
-    try { const x = await extra(p, edition); if (S.page === p && S.sel === i) el.textContent = x[i].text; }
+  const a = S.ayahs[i];                       // by global ayah number, so it works on either page of a spread
+  const put = async (el, ed) => {
+    try { const list = await edition(ed); if (S.page === p && S.sel === i) el.textContent = list[a.number - 1]; }
     catch (e) { if (S.page === p && S.sel === i) el.textContent = '—'; }
   };
   if (ed !== 'none') put($('tr'), ed);
@@ -389,13 +450,13 @@ function stopAudio() {
   const a = S.audio; S.audio = null;
   if (a) { a.onended = a.onerror = null; a.pause(); a.removeAttribute('src'); a.load(); }
   $('play').textContent = '▶';
-  document.querySelectorAll('.ayah.cur').forEach(e => e.classList.remove('cur'));
+  $('book').querySelectorAll('.ayah.cur').forEach(e => e.classList.remove('cur'));
   S.playing = null;
   showRep();
 }
 function playFrom(i, n = 1) {
   stopAudio();
-  if (i >= S.ayahs.length) { if (S.page < 604) loadPage(S.page + 1, { play: true }); return; }
+  if (i >= S.ayahs.length) { const nx = S.page + (S.spread ? 2 : 1); if (nx <= 604) loadPage(nx, { play: true }); return; }
   const a = S.ayahs[i];
   const opt = $('rec').options[$('rec').selectedIndex];
   // Most reciters come from islamic.network (by global ayah number). Reciters marked data-ea
@@ -407,7 +468,7 @@ function playFrom(i, n = 1) {
   const au = new Audio(url);
   S.audio = au;
   $('play').textContent = '⏸';
-  const parts = document.querySelectorAll(`.ayah[data-i="${i}"]`);
+  const parts = $('book').querySelectorAll(`.ayah[data-i="${i}"]`);
   parts.forEach(e => e.classList.add('cur'));
   if (parts[0]) parts[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
   // Stop instead of silently skipping to the wrong ayah. Recitation is streamed, so say so when offline.
@@ -433,7 +494,7 @@ function playFrom(i, n = 1) {
 // ---------- Ayah repetition menu ----------
 function showRep() {
   const btn = $('repBtn');
-  btn.textContent = S.rep > 1 ? '🔁 ' + ar(S.rep) : '🔁 تكرار';
+  btn.innerHTML = '🔁' + (S.rep > 1 ? `<b class="badge">${ar(S.rep)}</b>` : '');
   btn.classList.toggle('on', S.rep > 1);
   document.querySelectorAll('#repPresets button').forEach(b => b.classList.toggle('on', +b.dataset.n === S.rep));
   if (document.activeElement !== $('repN')) $('repN').value = S.rep;
@@ -510,10 +571,10 @@ $('turnBtn').onclick = () => {
   }, 1500);
 };
 function endTurnAnim() {
-  $('page').classList.remove(...TURN_ANIMS);
+  $('book').classList.remove(...TURN_ANIMS);
   $('reader').classList.remove('anim');
 }
-$('page').addEventListener('animationend', e => { if (e.target === $('page')) endTurnAnim(); });
+$('book').addEventListener('animationend', e => { if (e.target === $('book')) endTurnAnim(); });
 // In scroll mode a page that is taller than the screen first scrolls normally; the page turns only
 // when it is already at its bottom (next) or top (previous).
 const atBottom = () => { const r = $('reader'); return r.scrollTop + r.clientHeight >= r.scrollHeight - 2; };
@@ -622,7 +683,36 @@ function setFont(v) {
 $('fMinus').onclick = () => setFont(fs - 0.1);
 $('fPlus').onclick = () => setFont(fs + 0.1);
 
+// ---------- Keep the screen on while reading ----------
+// The phone would turn its screen off after a short time without touches, in the middle of reading.
+// The Screen Wake Lock asks it to stay on while the app is open. The phone drops the lock whenever the
+// app is hidden, so take it again when the app comes back, and on the next touch if it was refused.
+S.awake = store.get('awake') !== '0';
+let wakeLock = null, wakeAsking = false;
+async function keepAwake() {
+  if (!S.awake || wakeLock || wakeAsking || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+  wakeAsking = true;
+  try {
+    const l = await navigator.wakeLock.request('screen');
+    l.addEventListener('release', () => { if (wakeLock === l) wakeLock = null; });
+    if (S.awake) wakeLock = l; else l.release();
+  } catch (e) {}
+  wakeAsking = false;
+}
+function setAwake(on) {
+  S.awake = on;
+  store.set('awake', on ? '1' : '0');
+  $('awakeBtn').textContent = '☀ إبقاء الشاشة مضاءة: ' + (on ? 'تشغيل' : 'إيقاف');
+  $('awakeBtn').setAttribute('aria-pressed', on);
+  if (on) keepAwake();
+  else if (wakeLock) { const l = wakeLock; wakeLock = null; l.release().catch(() => {}); }
+}
+$('awakeBtn').onclick = () => setAwake(!S.awake);
+document.addEventListener('visibilitychange', keepAwake);
+['click', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, keepAwake, { passive: true }));
+
 // ---------- Start ----------
+setAwake(S.awake);
 setTheme(store.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 setFont(fs);
 if (store.get('tr')) $('trSel').value = store.get('tr');

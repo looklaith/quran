@@ -23,21 +23,38 @@ button:hover{border-color:var(--accent)}
 #reader{height:100%;overflow-y:auto;padding:4px;display:flex;-webkit-tap-highlight-color:transparent}
 /* ---- printed-page look: patterned frame, surah + juz boxes on top, page number at the bottom ---- */
 /* Full screen: the frame is at least as tall as the screen and the lines spread evenly inside it. */
-#page{width:100%;margin:0 auto;min-height:100%;align-self:flex-start;display:flex;flex-direction:column;background:var(--page);padding:10px 14px 8px;border:9px solid transparent;
+.page{flex:1 1 0;min-width:0;display:flex;flex-direction:column;background:var(--page);padding:10px 14px 8px;border:9px solid transparent;
   border-image:repeating-linear-gradient(45deg,var(--frame) 0 2px,transparent 2px 6px,var(--frame) 6px 7px,transparent 7px 10px) 9;
-  outline:2px solid var(--frame);outline-offset:1px;box-shadow:inset 0 0 0 2px var(--frame),inset 0 0 0 5px var(--page),inset 0 0 0 6px var(--frame)}
-#phead{display:flex;justify-content:space-between;gap:8px;margin:2px 0 6px;font-family:'Amiri',serif;font-size:clamp(.72rem,3.3vw,1.15rem);white-space:nowrap}
-#phead span,#hPage{border:1.5px solid var(--frame);background:color-mix(in srgb,var(--frame) 10%,var(--page));padding:0 14px;line-height:1.9}
-#phead span{border-radius:14px 14px 4px 4px;min-width:30%;text-align:center;padding:0 8px;overflow:hidden;text-overflow:ellipsis}
-#pfoot{text-align:center;margin-top:6px;font-family:'Amiri',serif}
-#hPage{display:inline-block;min-width:3em;border-radius:50%/60%}
-#text{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;width:100%;font-family:'UthmanicHafs','Amiri Quran','Amiri',serif;font-size:var(--fs);line-height:2.05;text-align:center}
+  outline:2px solid var(--frame);outline-offset:1px;box-shadow:inset 0 0 0 2px var(--frame),inset 0 0 0 5px var(--page),inset 0 0 0 6px var(--frame),var(--spine,0 0 transparent)}
+/* The book: one page on a phone; on a laptop / desktop an open Mushaf with two pages side by side
+   (odd page on the right, even page on the left, like the printed book). */
+#book{width:100%;min-height:100%;align-self:flex-start;display:flex;justify-content:center}
+#book.spread{gap:6px;padding:0 8px}
+#book.spread .page:first-child{--spine:inset 22px 0 26px -20px rgba(0,0,0,.38)}
+#book.spread .page:last-child{--spine:inset -22px 0 26px -20px rgba(0,0,0,.38)}
+/* Turning a page of the open book: a leaf lifts at the spine and turns over to the other side. */
+#flip{position:fixed;inset:0;z-index:15;pointer-events:none;perspective:2400px}
+#flip>div{position:absolute}
+#flip .leaf{transform-style:preserve-3d}
+#flip .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex}
+#flip .back{transform:rotateY(180deg)}
+#flip .page{max-width:none!important;flex:1;box-shadow:inset 0 0 0 2px var(--frame),inset 0 0 0 5px var(--page),inset 0 0 0 6px var(--frame),0 0 26px rgba(0,0,0,.28)}
+#flip .leaf.next{transform-origin:right center;animation:leafNext .75s cubic-bezier(.45,.05,.35,1) forwards}
+#flip .leaf.prev{transform-origin:left center;animation:leafPrev .75s cubic-bezier(.45,.05,.35,1) forwards}
+@keyframes leafNext{to{transform:rotateY(180deg)}}
+@keyframes leafPrev{to{transform:rotateY(-180deg)}}
+.phead{display:flex;justify-content:space-between;gap:8px;margin:2px 0 6px;font-family:'Amiri',serif;font-size:clamp(.72rem,3.3vw,1.15rem);white-space:nowrap}
+.phead span,.hPage{border:1.5px solid var(--frame);background:color-mix(in srgb,var(--frame) 10%,var(--page));padding:0 14px;line-height:1.9}
+.phead span{border-radius:14px 14px 4px 4px;min-width:30%;text-align:center;padding:0 8px;overflow:hidden;text-overflow:ellipsis}
+.pfoot{text-align:center;margin-top:6px;font-family:'Amiri',serif}
+.hPage{display:inline-block;min-width:3em;border-radius:50%/60%}
+.text{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;width:100%;font-family:'UthmanicHafs','Amiri Quran','Amiri',serif;font-size:var(--fs);line-height:2.05;text-align:center}
 /* One printed Mushaf line = one .line: never wraps, words spread to fill the full width. */
 .line{display:block;white-space:nowrap;text-align:justify;text-align-last:justify}
-#text.opening .line,.line.sura,.line.bism{text-align:center;text-align-last:center}
-#text.opening{justify-content:center}
+.text.opening .line,.line.sura,.line.bism{text-align:center;text-align-last:center}
+.text.opening{justify-content:center}
 .line.short{text-align:center;text-align-last:center}
-#text.measure .line{width:max-content}   /* used for a moment to measure each line's natural width */
+.text.measure .line{width:max-content}   /* used for a moment to measure each line's natural width */
 .ayah{cursor:pointer;border-radius:6px}
 .ayah.sel{background:color-mix(in srgb,var(--accent) 22%,transparent)}
 .ayah.cur{background:color-mix(in srgb,var(--accent) 40%,transparent)}
@@ -51,9 +68,17 @@ button:hover{border-color:var(--accent)}
 #top{top:0;border-bottom:1px solid var(--border);transform:translateY(-100%)}
 #bot{bottom:0;border-top:1px solid var(--border);transform:translateY(100%);padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 body.menu #top,body.menu #bot{transform:none}
-.grp{display:flex;align-items:center;gap:6px}
+.grp{display:flex;align-items:center;gap:5px}
 #lbl{font-size:.95rem;text-align:center;flex:1}
-#pg{width:64px;text-align:center}
+/* Every button is round: icon buttons are circles, buttons with words are pills. */
+button{border-radius:999px}
+.bar button,#sheet .row button.mic,#sx,#repX,#vp .x{width:40px;height:40px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;line-height:1;position:relative}
+#pg{width:60px;height:40px;text-align:center;border-radius:20px}
+.badge{position:absolute;top:-4px;left:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--bg);font:bold .7rem/18px sans-serif}
+/* A+ and A− are always on screen: two circles fixed at the top (below the bar when it is open). */
+#fontBtns{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:25;display:flex;gap:10px;transition:top .3s}
+#fontBtns button{width:40px;height:40px;padding:0;border-radius:50%;font:bold 1rem/1 sans-serif;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+body.menu #fontBtns{top:calc(70px + env(safe-area-inset-top))}
 #sheet{position:fixed;left:0;right:0;bottom:0;z-index:30;max-height:62vh;overflow-y:auto;background:var(--panel);border-top:1px solid var(--border);padding:14px 18px calc(18px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s}
 #sheet.open{transform:none}
 #sheet .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -71,17 +96,16 @@ body.menu #top,body.menu #bot{transform:none}
 #drawer .priv{padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--border);color:var(--accent);font-size:.9rem;text-align:center}
 
 /* ---- page flip ---- */
-#text{transition:opacity .2s}
+.text{transition:opacity .2s}
 @keyframes flipOut{to{transform:perspective(1500px) rotateY(-70deg) scaleX(.6);opacity:0}}
 @keyframes flipOutPrev{to{transform:perspective(1500px) rotateY(70deg) scaleX(.6);opacity:0}}
 @keyframes pageInNext{from{transform:perspective(1500px) rotateY(-20deg) scaleX(.9);opacity:.3}to{transform:none;opacity:1}}
 @keyframes pageInPrev{from{transform:perspective(1500px) rotateY(20deg) scaleX(.9);opacity:.3}to{transform:none;opacity:1}}
-#text{transform-origin:right center}
-#text.out-next{animation:flipOut .18s ease-in forwards}
-#text.out-prev{animation:flipOutPrev .18s ease-in forwards}
-#text.in-next{animation:pageInNext .3s ease-out}
-#text.in-prev{animation:pageInPrev .3s ease-out}
-@media (prefers-reduced-motion:reduce){#text{animation:none!important}}
+.text{transform-origin:right center}
+.text.out-next{animation:flipOut .18s ease-in forwards}
+.text.out-prev{animation:flipOutPrev .18s ease-in forwards}
+.text.in-next{animation:pageInNext .3s ease-out}
+.text.in-prev{animation:pageInPrev .3s ease-out}
 /* Other page-turn styles (menu setting): slide sideways, or move up/down like scrolling. */
 #reader{overflow-x:hidden;overscroll-behavior:contain}
 #reader.anim{overflow:hidden}
@@ -89,25 +113,24 @@ body.menu #top,body.menu #bot{transform:none}
 @keyframes slidePrev{from{transform:translateX(100%)}}
 @keyframes scrollNext{from{transform:translateY(100%)}}
 @keyframes scrollPrev{from{transform:translateY(-100%)}}
-#page.slide-next{animation:slideNext .3s ease-out}
-#page.slide-prev{animation:slidePrev .3s ease-out}
-#page.scroll-next{animation:scrollNext .35s ease-out}
-#page.scroll-prev{animation:scrollPrev .35s ease-out}
-@media (prefers-reduced-motion:reduce){#page{animation:none!important}}
+#book.slide-next{animation:slideNext .3s ease-out}
+#book.slide-prev{animation:slidePrev .3s ease-out}
+#book.scroll-next{animation:scrollNext .35s ease-out}
+#book.scroll-prev{animation:scrollPrev .35s ease-out}
 
 /* ---- tajweed colors (only when the switch is on) ---- */
-#text tajweed{color:inherit}
-body.tj #text tajweed.ham_wasl,body.tj #text tajweed.slnt,body.tj #text tajweed.laam_shamsiyah{color:#9a9a9a}
-body.tj #text tajweed.madda_normal{color:#d4571a}
-body.tj #text tajweed.madda_permissible{color:#e08a00}
-body.tj #text tajweed.madda_necessary,body.tj #text tajweed.madda_obligatory,body.tj #text tajweed.madda_obligatory_monfasel,body.tj #text tajweed.madda_obligatory_mottasel{color:#b3201f}
-body.tj #text tajweed.qalaqah{color:#2f6fd0}
-body.tj #text tajweed.ikhfa_shafawi,body.tj #text tajweed.ikhfa,body.tj #text tajweed.ikhafa_shafawi,body.tj #text tajweed.ikhafa{color:#c2307a}
-body.tj #text tajweed.iqlab{color:#1a9aa0}
-body.tj #text tajweed.idgham_ghunnah,body.tj #text tajweed.idgham_wo_ghunnah,body.tj #text tajweed.idgham_shafawi,body.tj #text tajweed.idgham_mutajanisayn,body.tj #text tajweed.idgham_mutaqaribayn{color:#2e9b4d}
-body.tj #text tajweed.ghunnah{color:#e0457b}
-body.dark.tj #text tajweed.qalaqah{color:#6aa3ff}
-body.night.tj #text tajweed.qalaqah{color:#7fb0ff}
+.text tajweed{color:inherit}
+body.tj .text tajweed.ham_wasl,body.tj .text tajweed.slnt,body.tj .text tajweed.laam_shamsiyah{color:#9a9a9a}
+body.tj .text tajweed.madda_normal{color:#d4571a}
+body.tj .text tajweed.madda_permissible{color:#e08a00}
+body.tj .text tajweed.madda_necessary,body.tj .text tajweed.madda_obligatory,body.tj .text tajweed.madda_obligatory_monfasel,body.tj .text tajweed.madda_obligatory_mottasel{color:#b3201f}
+body.tj .text tajweed.qalaqah{color:#2f6fd0}
+body.tj .text tajweed.ikhfa_shafawi,body.tj .text tajweed.ikhfa,body.tj .text tajweed.ikhafa_shafawi,body.tj .text tajweed.ikhafa{color:#c2307a}
+body.tj .text tajweed.iqlab{color:#1a9aa0}
+body.tj .text tajweed.idgham_ghunnah,body.tj .text tajweed.idgham_wo_ghunnah,body.tj .text tajweed.idgham_shafawi,body.tj .text tajweed.idgham_mutajanisayn,body.tj .text tajweed.idgham_mutaqaribayn{color:#2e9b4d}
+body.tj .text tajweed.ghunnah{color:#e0457b}
+body.dark.tj .text tajweed.qalaqah{color:#6aa3ff}
+body.night.tj .text tajweed.qalaqah{color:#7fb0ff}
 #legend{display:none;margin-top:10px;font-size:.9rem;line-height:2}
 body.tj #legend.show{display:block}
 #legend i{display:inline-block;width:.9em;height:.9em;border-radius:50%;vertical-align:middle;margin-inline:4px 4px}
@@ -148,18 +171,17 @@ body.tj #legend.show{display:block}
 <body class="light">
 
 <main id="reader">
-  <div id="page">
-    <div id="phead"><span id="hSura"></span><span id="hJuz"></span></div>
-    <div id="text"><div class="msg">…</div></div>
-    <div id="pfoot"><span id="hPage"></span></div>
-  </div>
+  <div id="book"><div class="page"><div class="text"><div class="msg">…</div></div></div></div>
 </main>
+<div id="flip"></div>
+
+<div id="fontBtns"><button id="fPlus" title="تكبير الخط">A+</button><button id="fMinus" title="تصغير الخط">A−</button></div>
 
 <header class="bar" id="top">
   <button id="openList" title="السور">☰</button>
   <span id="lbl"></span>
   <span class="grp">
-    <button id="repBtn" title="تكرار الآيات" aria-expanded="false">🔁 تكرار</button><button id="fMinus">A−</button><button id="fPlus">A+</button><button id="turnBtn" title="طريقة تقليب الصفحات">📖</button><button id="theme">◐</button>
+    <button id="repBtn" title="تكرار الآيات" aria-expanded="false">🔁</button><button id="turnBtn" title="طريقة تقليب الصفحات">📖</button><button id="theme" title="الألوان">◐</button>
   </span>
 </header>
 
@@ -233,6 +255,7 @@ body.tj #legend.show{display:block}
       <option value="scroll">تقليب الصفحات: تمرير لأسفل</option>
     </select>
     <button id="tjBtn" aria-pressed="false">التجويد: إيقاف</button>
+    <button id="awakeBtn" aria-pressed="true">☀ إبقاء الشاشة مضاءة: تشغيل</button>
     <button id="lgBtn" style="display:none">دليل الألوان</button>
     <div id="legend">
       <div><i style="background:#d4571a"></i>مد طبيعي</div>
