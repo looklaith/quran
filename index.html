@@ -53,6 +53,11 @@ button:hover{border-color:var(--accent)}
 .line{display:block;white-space:nowrap;text-align:justify;text-align-last:justify}
 .text.opening .line,.line.sura,.line.bism{text-align:center;text-align-last:center}
 .text.opening{justify-content:center}
+/* Large text on a phone (A+ past the page width): the words flow as wrapped lines and the page scrolls. */
+.text.flow{display:block;text-align:justify;text-align-last:right;line-height:2.1}
+.text.flow .line{display:inline;white-space:normal;text-align:inherit;text-align-last:inherit}
+.text.flow .line:not(.sura):not(.bism)::after{content:' '}
+.text.flow .line.sura,.text.flow .line.bism{display:block;text-align:center;text-align-last:center}
 .line.short{text-align:center;text-align-last:center}
 .text.measure .line{width:max-content}   /* used for a moment to measure each line's natural width */
 .ayah{cursor:pointer;border-radius:6px}

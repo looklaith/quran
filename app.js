@@ -270,9 +270,9 @@ function fitPage() {
     x.box.classList.remove('measure');
     return w;
   };
-  parts.forEach(x => { x.box.style.fontSize = ''; x.pg.style.maxWidth = ''; });
+  parts.forEach(x => { x.box.style.fontSize = ''; x.pg.style.maxWidth = ''; x.box.classList.remove('flow'); });
   book.style.minHeight = '0';
-  let widthSize = Infinity, frameW = 0;
+  let widthSize = Infinity, fitW = Infinity, frameW = 0;
   for (const x of parts) {
     const widths = measure(x), widest = Math.max(0, ...widths);
     // A line with only a few words (e.g. the end of An-Nas) would get huge gaps if stretched to the
@@ -282,10 +282,25 @@ function fitPage() {
     if (!widest || room < 50) { book.style.minHeight = ''; return; }   // not laid out yet
     frameW = x.pg.offsetWidth - room;
     const k = room / widest * 0.98;                                   // fit the width
-    widthSize = Math.min(widthSize, fs * (spread ? k : Math.min(1, k)));
+    fitW = Math.min(fitW, fs * k);                                    // largest size whose lines fit
+  }
+  const setSize = s => parts.forEach(x => { x.box.style.fontSize = s.toFixed(3) + 'rem'; });
+  // One page (phone): the normal page fits the screen. A+ / A− scale the text from there. A phone's
+  // page is already as wide as the screen, so text larger than that cannot keep the printed lines:
+  // it then flows as wrapped lines and the page scrolls down, so A+ always makes the text bigger.
+  const zoom = fs / BASE_FS;
+  if (spread) widthSize = fitW;
+  else {
+    widthSize = Math.min(BASE_FS, fitW) * Math.min(1, zoom);
+    const want = Math.min(BASE_FS, fitW) * zoom;
+    if (want > fitW * 1.01) {
+      parts.forEach(x => x.box.classList.add('flow'));
+      setSize(want);
+      book.style.minHeight = '';
+      return;
+    }
   }
   let size = widthSize;
-  const setSize = s => parts.forEach(x => { x.box.style.fontSize = s.toFixed(3) + 'rem'; });
   const tallest = () => parts.reduce((a, b) => (b.pg.offsetHeight > a.pg.offsetHeight ? b : a));
   setSize(size);
   // Fit the height too, so the whole page is on screen: only the text scales; header, footer and
@@ -298,7 +313,7 @@ function fitPage() {
       size *= Math.max(0.3, (avail - fixedH) / textH) * 0.99;
       setSize(size);
     }
-    if (spread) size = Math.min(widthSize, size * fs / BASE_FS);
+    if (spread) size = Math.min(widthSize, size * zoom);
     else if (size < widthSize * 0.6) size = widthSize;
     setSize(size);
   }
@@ -708,15 +723,16 @@ $('theme').onclick = () => {
   const cur = themes.find(t => document.body.classList.contains(t)) || 'light';
   setTheme(themes[(themes.indexOf(cur) + 1) % 3]);
 };
-let fs = parseFloat(store.get('fs')) || 1.9;
+let fs = parseFloat(store.get('fs2')) || 1.9;      // fs2: sizes are now relative to the fitted page
 function setFont(v) {
-  fs = Math.max(1.2, Math.min(3.5, +v.toFixed(1)));
+  fs = Math.max(1.0, Math.min(5, +v.toFixed(1)));
   document.documentElement.style.setProperty('--fs', fs + 'rem');
-  store.set('fs', fs);
+  store.set('fs2', fs);
   fitPage();
 }
-$('fMinus').onclick = () => setFont(fs - 0.1);
-$('fPlus').onclick = () => setFont(fs + 0.1);
+// Each tap changes the size by about 10%, so it is easy to see.
+$('fMinus').onclick = e => { e.stopPropagation(); setFont(fs - 0.2); };
+$('fPlus').onclick = e => { e.stopPropagation(); setFont(fs + 0.2); };
 
 // ---------- Keep the screen on while reading ----------
 // The phone would turn its screen off after a short time without touches, in the middle of reading.
