@@ -254,6 +254,7 @@ function pageHTML({ p, ayahs, lines, surahs, tj }, off) {
 // In the two-page book both pages get the same text size, as large as the screen allows: the
 // whole spread fills the screen height. A+ / A− make it larger or smaller from there.
 const BASE_FS = 1.9;
+const LINE_EM = 19.5;          // a full printed Mushaf line is about 19.5 em wide in the Hafs font
 function fitPage() {
   const book = $('book'), reader = $('reader');
   const parts = bookPages().map(pg => ({ pg, box: pg.querySelector('.text'), ls: [...pg.querySelectorAll('.line')] }))
@@ -289,8 +290,21 @@ function fitPage() {
   // page is already as wide as the screen, so text larger than that cannot keep the printed lines:
   // it then flows as wrapped lines and the page scrolls down, so A+ always makes the text bigger.
   const zoom = fs / BASE_FS;
-  if (spread) widthSize = fitW;
-  else {
+  if (spread) {
+    // Open book: every page as big as the opening pages. The text fills the page width, so a page of
+    // 15 lines is taller than the screen and scrolls down (the wheel turns the page at the bottom).
+    // Pages 1-2 have short lines; they get the size of a normal page, so all pages look the same.
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const normal = parts[0].box.clientWidth * 0.98 / LINE_EM / rem;
+    const want = Math.min(fitW, normal) * zoom;
+    if (want > fitW * 1.01) {                  // A+ past the page width: the lines wrap
+      parts.forEach(x => x.box.classList.add('flow'));
+      setSize(want);
+      book.style.minHeight = '';
+      return;
+    }
+    widthSize = want;
+  } else {
     widthSize = Math.min(BASE_FS, fitW) * Math.min(1, zoom);
     const want = Math.min(BASE_FS, fitW) * zoom;
     if (want > fitW * 1.01) {
@@ -307,7 +321,7 @@ function fitPage() {
   // frame stay the same size. On a very short screen (a phone held sideways) that would make the
   // text too small to read, so there the page keeps the width size and scrolls instead.
   const avail = reader.clientHeight - 8;
-  if (avail > 200) {
+  if (!spread && avail > 200) {
     for (let n = 0; n < 3 && tallest().pg.offsetHeight > avail; n++) {
       const x = tallest(), textH = x.box.offsetHeight, fixedH = x.pg.offsetHeight - textH;
       size *= Math.max(0.3, (avail - fixedH) / textH) * 0.99;
@@ -322,7 +336,7 @@ function fitPage() {
   // Measured again at the final size, so the frame can never be narrower than the text.
   // Both pages of a spread get the same width, so the spine stays in the middle.
   const w = Math.ceil(Math.max(...parts.map(x => Math.max(...measure(x)))) * 1.04 + frameW);
-  parts.forEach(x => { if (w < x.pg.offsetWidth) x.pg.style.maxWidth = w + 'px'; });
+  if (!spread) parts.forEach(x => { if (w < x.pg.offsetWidth) x.pg.style.maxWidth = w + 'px'; });   // book pages: all the same width
   for (const x of parts) {
     // Close the gaps: a line a little shorter than the page would get all the extra room as wide
     // spaces between words and ayahs. Enlarge its words slightly instead (at most 15%), so the gaps
@@ -332,7 +346,7 @@ function fitPage() {
     x.ls.forEach((l, i) => {
       if (l.matches('.short,.sura,.bism') || !nat[i]) return;
       const k = Math.min(1.15, full / nat[i]);
-      if (k > 1.005) { l.style.fontSize = k.toFixed(3) + 'em'; l.style.lineHeight = (2.05 / k).toFixed(3); }
+      if (k > 1.005) { l.style.fontSize = k.toFixed(3) + 'em'; l.style.lineHeight = ((spread ? 1.65 : 2.05) / k).toFixed(3); }
     });
     // A line still clearly short gets the rest the way the printed Mushaf does it: kashida (ـ)
     // lengthens the joins between letters, one stretch near the end of each word.

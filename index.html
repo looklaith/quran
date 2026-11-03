@@ -49,6 +49,9 @@ button:hover{border-color:var(--accent)}
 .pfoot{text-align:center;margin-top:6px;font-family:'Amiri',serif}
 .hPage{display:inline-block;min-width:3em;border-radius:50%/60%}
 .text{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;width:100%;font-family:'UthmanicHafs','Amiri Quran','Amiri',serif;font-size:var(--fs);line-height:2.05;text-align:center}
+/* The open book on a laptop: the lines sit a little closer together, as in the printed Mushaf,
+   so less scrolling is needed for each page. */
+#book.spread .text{line-height:1.65}
 /* One printed Mushaf line = one .line: never wraps, words spread to fill the full width. */
 .line{display:block;white-space:nowrap;text-align:justify;text-align-last:justify}
 .text.opening .line,.line.sura,.line.bism{text-align:center;text-align-last:center}
