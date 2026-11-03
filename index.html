@@ -64,21 +64,40 @@ button:hover{border-color:var(--accent)}
 .ovl{text-decoration:overline;text-decoration-thickness:1.5px}
 .sura{border:4px double var(--frame);border-radius:10px;background:color-mix(in srgb,var(--frame) 12%,var(--page));line-height:1.7;margin:2px 0}
 .msg{padding:40px;opacity:.7}
-.bar{position:fixed;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;background:var(--panel);transition:transform .3s}
-#top{top:0;border-bottom:1px solid var(--border);transform:translateY(-100%)}
-#bot{bottom:0;border-top:1px solid var(--border);transform:translateY(100%);padding-bottom:calc(10px + env(safe-area-inset-bottom))}
-body.menu #top,body.menu #bot{transform:none}
+/* The round menu: drops down from the big circle at the top. */
+#menu{position:fixed;top:calc(78px + env(safe-area-inset-top));left:50%;z-index:24;width:min(340px,calc(100vw - 20px));
+  transform:translateX(-50%) scale(.4);transform-origin:50% -40px;opacity:0;pointer-events:none;transition:transform .25s,opacity .2s;
+  background:var(--panel);border:1px solid var(--border);border-radius:28px;padding:12px 10px 8px;box-shadow:0 10px 32px rgba(0,0,0,.3)}
+body.menu #menu{transform:translateX(-50%);opacity:1;pointer-events:auto}
+#menu .row{display:flex;justify-content:space-around;align-items:flex-start;margin:4px 0 8px}
+#menu .it{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:64px;font-size:.78rem;cursor:pointer}
+#menu .it span{opacity:.8}
 .grp{display:flex;align-items:center;gap:5px}
-#lbl{font-size:.95rem;text-align:center;flex:1}
+#lbl{font-size:.95rem;text-align:center;padding:0 6px 6px;border-bottom:1px solid var(--border);margin-bottom:6px}
 /* Every button is round: icon buttons are circles, buttons with words are pills. */
 button{border-radius:999px}
-.bar button,#sheet .row button.mic,#sx,#repX,#vp .x{width:40px;height:40px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;line-height:1;position:relative}
+#menu button{width:50px;height:50px;font-size:1.25rem;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+#menu #pg{width:70px;height:50px;border-radius:25px;font-size:1.05rem}
+#menu button,#sheet .row button.mic,#sx,#repX,#vp .x{min-width:40px;min-height:40px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;line-height:1;position:relative}
 #pg{width:60px;height:40px;text-align:center;border-radius:20px}
 .badge{position:absolute;top:-4px;left:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--bg);font:bold .7rem/18px sans-serif}
 /* A+ and A− are always on screen: two circles fixed at the top (below the bar when it is open). */
-#fontBtns{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:25;display:flex;gap:10px;transition:top .3s}
+#fontBtns{position:fixed;top:calc(6px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px}
 #fontBtns button{width:40px;height:40px;padding:0;border-radius:50%;font:bold 1rem/1 sans-serif;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2)}
-body.menu #fontBtns{top:calc(70px + env(safe-area-inset-top))}
+/* The big circle in the middle: tap it and all the buttons come down. */
+#fontBtns #menuBtn{width:62px;height:62px;font-size:1.6rem;background:var(--accent);color:var(--bg);border:3px solid var(--page);box-shadow:0 3px 12px rgba(0,0,0,.3);transition:transform .25s}
+body.menu #fontBtns #menuBtn{transform:rotate(90deg)}
+/* Laptop / desktop: the outer edge of each page turns it with a mouse click, like taking hold of a page. */
+.page{position:relative}
+#book.spread .page::after{content:'';position:absolute;top:0;bottom:0;width:20%;pointer-events:none;opacity:0;transition:opacity .2s}
+#book.spread .page:first-child::after{right:0;background:linear-gradient(to left,color-mix(in srgb,var(--frame) 30%,transparent),transparent)}
+#book.spread .page:last-child::after{left:0;background:linear-gradient(to right,color-mix(in srgb,var(--frame) 30%,transparent),transparent)}
+#book.spread .page.hot::after{opacity:1}
+#book.spread .page.hot,#book.spread .page.hot .ayah{cursor:pointer}
+/* A folded corner at the bottom outer corner of each page shows it can be turned. */
+#book.spread .page::before{content:'';position:absolute;bottom:-1px;width:30px;height:30px;pointer-events:none;z-index:1}
+#book.spread .page:first-child::before{right:-1px;background:linear-gradient(225deg,transparent 50%,color-mix(in srgb,var(--frame) 45%,var(--page)) 50%);filter:drop-shadow(-1px -1px 2px rgba(0,0,0,.25))}
+#book.spread .page:last-child::before{left:-1px;background:linear-gradient(135deg,transparent 50%,color-mix(in srgb,var(--frame) 45%,var(--page)) 50%);filter:drop-shadow(1px -1px 2px rgba(0,0,0,.25))}
 #sheet{position:fixed;left:0;right:0;bottom:0;z-index:30;max-height:62vh;overflow-y:auto;background:var(--panel);border-top:1px solid var(--border);padding:14px 18px calc(18px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s}
 #sheet.open{transform:none}
 #sheet .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -146,7 +165,7 @@ body.tj #legend.show{display:block}
 @media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
 /* ---- ayah repetition menu ---- */
 #repBtn.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-#repPanel{position:fixed;top:calc(64px + env(safe-area-inset-top));left:10px;z-index:45;width:min(320px,calc(100vw - 20px));background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:1rem}
+#repPanel{position:fixed;top:calc(78px + env(safe-area-inset-top));left:10px;z-index:45;width:min(320px,calc(100vw - 20px));background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:1rem}
 #repPanel.show{display:block}
 #repPanel .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}
 #repPanel small{display:block;margin:8px 0 6px;color:var(--accent)}
@@ -175,27 +194,29 @@ body.tj #legend.show{display:block}
 </main>
 <div id="flip"></div>
 
-<div id="fontBtns"><button id="fPlus" title="تكبير الخط">A+</button><button id="fMinus" title="تصغير الخط">A−</button></div>
+<div id="fontBtns"><button id="fPlus" title="تكبير الخط">A+</button><button id="menuBtn" title="القائمة" aria-expanded="false" aria-controls="menu">☰</button><button id="fMinus" title="تصغير الخط">A−</button></div>
 
-<header class="bar" id="top">
-  <button id="openList" title="السور">☰</button>
-  <span id="lbl"></span>
-  <span class="grp">
-    <button id="repBtn" title="تكرار الآيات" aria-expanded="false">🔁</button><button id="turnBtn" title="طريقة تقليب الصفحات">📖</button><button id="theme" title="الألوان">◐</button>
-  </span>
-</header>
-
-<footer class="bar" id="bot">
-  <span class="grp">
-    <button id="prev" title="الصفحة السابقة">▶</button>
-    <input id="pg" type="number" min="1" max="604">
-    <button id="next" title="الصفحة التالية">◀</button>
-  </span>
-  <span class="grp">
-    <button id="play" title="تشغيل">▶</button><button id="stop" title="إيقاف">■</button>
-    <button class="mic" id="micBar" title="تحدث">🎤</button><button id="vl" title="لغة الصوت">ع</button>
-  </span>
-</footer>
+<!-- All the buttons live in this round menu; the big circle at the top opens and closes it. -->
+<nav id="menu" aria-label="القائمة">
+  <div id="lbl"></div>
+  <div class="row">
+    <label class="it"><button id="prev" title="الصفحة السابقة">▶</button><span>السابقة</span></label>
+    <label class="it"><input id="pg" type="number" min="1" max="604" aria-label="رقم الصفحة"><span>الصفحة</span></label>
+    <label class="it"><button id="next" title="الصفحة التالية">◀</button><span>التالية</span></label>
+  </div>
+  <div class="row">
+    <label class="it"><button id="play" title="تشغيل">▶</button><span>تشغيل</span></label>
+    <label class="it"><button id="stop" title="إيقاف">■</button><span>إيقاف</span></label>
+    <label class="it"><button id="repBtn" title="تكرار الآيات" aria-expanded="false">🔁</button><span>تكرار</span></label>
+    <label class="it"><button class="mic" id="micBar" title="تحدث">🎤</button><span>تحدث</span></label>
+  </div>
+  <div class="row">
+    <label class="it"><button id="openList" title="السور">📜</button><span>السور</span></label>
+    <label class="it"><button id="turnBtn" title="طريقة تقليب الصفحات">📖</button><span>التقليب</span></label>
+    <label class="it"><button id="theme" title="الألوان">◐</button><span>الألوان</span></label>
+    <label class="it"><button id="vl" title="لغة الصوت">ع</button><span>اللغة</span></label>
+  </div>
+</nav>
 
 <section id="sheet">
   <div class="row"><b id="ref"></b>

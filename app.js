@@ -403,12 +403,46 @@ if (window.ResizeObserver) {
 if (document.fonts) document.fonts.ready.then(fitPage);
 
 // ---------- Tap handling ----------
+// The big circle at the top opens and closes the menu with all the buttons.
+function setMenu(open) {
+  document.body.classList.toggle('menu', open);
+  $('menuBtn').setAttribute('aria-expanded', open);
+  $('menuBtn').textContent = open ? '✕' : '☰';
+}
+$('menuBtn').onclick = e => { e.stopPropagation(); setMenu(!document.body.classList.contains('menu')); };
+// Open book on a laptop / desktop: a mouse click on the outer edge of a page turns it, like taking
+// hold of a real page. Left page = next, right page = previous (Arabic books open to the left).
+// The rest of the page still works as before: click an ayah for its tafsir.
+function edgeTurn(e) {
+  if (!S.spread || e.pointerType === 'touch') return 0;
+  const pg = e.target.closest && e.target.closest('#book > .page');
+  if (!pg) return 0;
+  const r = pg.getBoundingClientRect(), edge = r.width * 0.2;
+  if (pg === $('book').firstElementChild) return e.clientX > r.right - edge ? -1 : 0;
+  return e.clientX < r.left + edge ? 1 : 0;
+}
+$('reader').addEventListener('mousemove', e => {
+  const d = edgeTurn(e);
+  bookPages().forEach((pg, i) => pg.classList.toggle('hot', !!d && i === (d > 0 ? 1 : 0)));
+});
+$('reader').addEventListener('mouseleave', () => bookPages().forEach(pg => pg.classList.remove('hot')));
+// Dragging a page with the mouse also turns it (drag to the right = next, as with a finger).
+let mdx = null, dragged = false;
+$('reader').addEventListener('mousedown', e => { mdx = S.spread && e.button === 0 ? e.clientX : null; dragged = false; });
+$('reader').addEventListener('mouseup', e => {
+  if (mdx === null) return;
+  const dx = e.clientX - mdx; mdx = null;
+  if (Math.abs(dx) > 60 && !getSelection().toString()) { dragged = true; go(dx > 0 ? 1 : -1); }
+});
 $('reader').addEventListener('click', e => {
-  const a = e.target.closest('.ayah');
+  if (dragged) { dragged = false; return; }
   closeList();
+  const d = edgeTurn(e);
+  if (d) { closeSheet(); return go(d); }
+  const a = e.target.closest('.ayah');
   if (a) return selectAyah(+a.dataset.i);
   if ($('sheet').classList.contains('open')) return closeSheet();
-  document.body.classList.toggle('menu');
+  setMenu(!document.body.classList.contains('menu'));
 });
 
 function selectAyah(i) {
@@ -608,7 +642,7 @@ $('reader').addEventListener('touchend', e => {
 // flick of the wheel turns one page, not several.
 let wheelSum = 0, wheelLock = 0;
 $('reader').addEventListener('wheel', e => {
-  if (S.turn !== 'scroll') return;
+  if (S.turn !== 'scroll' && !S.spread) return;     // the open book on a laptop turns with the wheel too
   if (Date.now() < wheelLock) { wheelSum = 0; return; }
   if ((e.deltaY > 0 && atBottom()) || (e.deltaY < 0 && atTop())) {
     wheelSum += e.deltaY;
@@ -625,6 +659,7 @@ function renderList() {
 }
 async function openList() {
   $('drawer').classList.add('open');
+  setMenu(false);
   if (!S.surahs) {
     try { S.surahs = (await db()).surahs; renderList(); }
     catch (e) { $('list').innerHTML = '<li>⚠️ تعذّر التحميل</li>'; }
