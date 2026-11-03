@@ -628,8 +628,31 @@ $('book').addEventListener('animationend', e => { if (e.target === $('book')) en
 // when it is already at its bottom (next) or top (previous).
 const atBottom = () => { const r = $('reader'); return r.scrollTop + r.clientHeight >= r.scrollHeight - 2; };
 const atTop = () => $('reader').scrollTop <= 1;
+// Full screen on a laptop / desktop: the ⛶ circle (top corner or menu) or the F key; Esc leaves it.
+// The book re-fits itself to the bigger screen. Hidden where the browser cannot do it (iPhone).
+const fsEl = document.documentElement;
+const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function toggleFullscreen() {
+  if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else {
+    const req = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen;
+    const r = req && req.call(fsEl);
+    if (r && r.catch) r.catch(() => {});
+  }
+}
+function showFs() {
+  const on = fsOn();
+  document.querySelectorAll('.fsBtn').forEach(b => { b.textContent = on ? '🗗' : '⛶'; b.title = on ? 'الخروج من ملء الشاشة (F)' : 'ملء الشاشة (F)'; });
+  const lbl = $('fsMenu').nextElementSibling;
+  if (lbl) lbl.textContent = on ? 'خروج من ملء الشاشة' : 'ملء الشاشة';
+}
+if (!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen)) document.body.classList.add('noFs');
+document.querySelectorAll('.fsBtn').forEach(b => b.onclick = e => { e.stopPropagation(); toggleFullscreen(); });
+document.addEventListener('fullscreenchange', showFs);
+document.addEventListener('webkitfullscreenchange', showFs);
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if ((e.key === 'f' || e.key === 'F' || e.key === 'ب') && !e.ctrlKey && !e.metaKey && !e.altKey) toggleFullscreen();
   if (e.key === 'ArrowLeft') go(1);
   if (e.key === 'ArrowRight') go(-1);
   if (S.turn === 'scroll') {

@@ -90,6 +90,11 @@ button{border-radius:999px}
 #fontBtns{position:fixed;top:calc(6px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px}
 #fontBtns button{width:40px;height:40px;padding:0;border-radius:50%;font:bold 1rem/1 sans-serif;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2)}
 /* The big circle in the middle: tap it and all the buttons come down. */
+/* Full screen (laptop / desktop): a circle in the top corner, outside the book, and one in the menu. */
+#fsTop{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;z-index:25;width:44px;height:44px;padding:0;border-radius:50%;font-size:1.3rem;line-height:1;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2);display:none}
+@media (hover:hover) and (pointer:fine){#fsTop{display:inline-flex;align-items:center;justify-content:center}}
+body.noFs #fsTop,body.noFs .fsItem{display:none!important}
 #fontBtns #menuBtn{width:62px;height:62px;font-size:1.6rem;background:var(--accent);color:var(--bg);border:3px solid var(--page);box-shadow:0 3px 12px rgba(0,0,0,.3);transition:transform .25s}
 body.menu #fontBtns #menuBtn{transform:rotate(90deg)}
 /* Laptop / desktop: the outer edge of each page turns it with a mouse click, like taking hold of a page. */
@@ -200,6 +205,7 @@ body.tj #legend.show{display:block}
 <div id="flip"></div>
 
 <div id="fontBtns"><button id="fPlus" title="تكبير الخط">A+</button><button id="menuBtn" title="القائمة" aria-expanded="false" aria-controls="menu">☰</button><button id="fMinus" title="تصغير الخط">A−</button></div>
+<button id="fsTop" class="fsBtn" title="ملء الشاشة (F)">⛶</button>
 
 <!-- All the buttons live in this round menu; the big circle at the top opens and closes it. -->
 <nav id="menu" aria-label="القائمة">
@@ -220,6 +226,9 @@ body.tj #legend.show{display:block}
     <label class="it"><button id="turnBtn" title="طريقة تقليب الصفحات">📖</button><span>التقليب</span></label>
     <label class="it"><button id="theme" title="الألوان">◐</button><span>الألوان</span></label>
     <label class="it"><button id="vl" title="لغة الصوت">ع</button><span>اللغة</span></label>
+  </div>
+  <div class="row fsItem">
+    <label class="it"><button id="fsMenu" class="fsBtn" title="ملء الشاشة (F)">⛶</button><span>ملء الشاشة</span></label>
   </div>
 </nav>
 
