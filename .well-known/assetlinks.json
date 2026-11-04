@@ -1,0 +1,11 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "online.laithissa.mushafi",
+    "sha256_cert_fingerprints": [
+      "C3:F2:31:82:53:49:03:B5:CD:BC:85:E7:F2:1D:D5:0A:A7:D7:56:B5:D0:FA:AA:14:60:07:5B:6D:11:4F:E1:6D",
+      "13:01:2B:EB:D3:61:1F:26:22:EB:41:70:04:75:FB:52:DC:8D:23:31:CC:53:5D:80:DE:7B:28:F4:6A:36:4B:83"
+    ]
+  }
+}]
