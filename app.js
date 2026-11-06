@@ -291,7 +291,10 @@ function fitPage(shrink) {
   // One page (phone): the normal page fits the screen. A+ / A− scale the text from there. A phone's
   // page is already as wide as the screen, so text larger than that cannot keep the printed lines:
   // it then flows as wrapped lines and the page scrolls down, so A+ always makes the text bigger.
-  const zoom = fs / BASE_FS;
+  // A phone held upright has no A+ / A−: the page is always the whole printed page, exactly fitted
+  // (the saved size from sideways / laptop use is ignored there).
+  const upright = !spread && !side && innerWidth < 600;
+  const zoom = upright ? 1 : fs / BASE_FS;
   if (spread) {
     // Open book: every page as big as the opening pages. The text fills the page width, so a page of
     // 15 lines is taller than the screen and scrolls down (the wheel turns the page at the bottom).

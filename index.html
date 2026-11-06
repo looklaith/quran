@@ -91,6 +91,8 @@ button{border-radius:999px}
 .badge{position:absolute;top:-4px;left:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--bg);font:bold .7rem/18px sans-serif}
 /* A+ and A− are always on screen: two circles fixed at the top (below the bar when it is open). */
 #fontBtns{position:fixed;top:calc(6px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px}
+/* A phone held upright always shows the whole printed page, exactly fitted: no A+ / A− there. */
+@media (orientation:portrait) and (max-width:599px){#fPlus,#fMinus{display:none}}
 #fontBtns button{width:40px;height:40px;padding:0;border-radius:50%;font:bold 1rem/1 sans-serif;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2)}
 /* The big circle in the middle: tap it and all the buttons come down. */
 /* Full screen (laptop / desktop): a circle in the top corner, outside the book, and one in the menu. */
