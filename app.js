@@ -213,7 +213,10 @@ function pageHTML({ p, ayahs, lines, surahs, tj }, off) {
   lines.forEach((ln, L) => {
     if (ln[0] === 'h') { h += `<div class="line sura">${esc(surahs[ln[1] - 1].name)}</div>`; return; }
     if (ln[0] === 'b') { h += '<div class="line bism">بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ</div>'; return; }
-    h += '<div class="line">' + ln.map(([g, words, end]) => {
+    // The last line of a surah may be short and is centred, as in print. Every other line is full width.
+    const lastSeg = ln[ln.length - 1], la = ayahs[lastSeg[0] - base];
+    const ends = lastSeg[2] && la && la.numberInSurah === la.surah.numberOfAyahs;
+    h += '<div class="line' + (ends ? ' last' : '') + '">' + ln.map(([g, words, end]) => {
       const i = g - base, a = ayahs[i];
       // Plain text, or the tajweed-tagged words of this same ayah on this same line when the switch is on.
       // Small pause marks (ۖ ۗ ۚ ۛ ...) come as separate words; join them to the word before, as in print.
@@ -280,7 +283,9 @@ function fitPage(shrink) {
     const widths = measure(x), widest = Math.max(0, ...widths);
     // A line with only a few words (e.g. the end of An-Nas) would get huge gaps if stretched to the
     // full width; the printed Mushaf lengthens letters instead, which browsers cannot do. Centre it.
-    x.ls.forEach((l, i) => l.classList.toggle('short', widths[i] < widest * 0.65));
+    // Only the last line of a surah stays short (centred); a short line inside a surah is stretched to
+    // the full width like every other line, as the printed Mushaf does (e.g. page 443 line 13).
+    x.ls.forEach((l, i) => l.classList.toggle('short', l.classList.contains('last') && widths[i] < widest * 0.65));
     const room = x.box.clientWidth;
     if (!widest || room < 50) { book.style.minHeight = ''; return; }   // not laid out yet
     frameW = x.pg.offsetWidth - room;
@@ -373,12 +378,15 @@ function fitPage(shrink) {
 const KD_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', KD_MARK = /[ً-ٰٟۖ-ۭ]/,
       KD_NEXT = /[آ-يٱ-ۓ]/;
 function kashida(line, room) {
-  // Width of one kashida at this line's size.
+  // Width of one kashida at this line's size, measured between two joined letters: a lone kashida
+  // is drawn wider than one inside a word, which made long gaps get far too few kashidas.
   const probe = document.createElement('span');
   probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap';
-  probe.textContent = 'ـــــــــــــــــــ';
   line.appendChild(probe);
-  const kw = probe.offsetWidth / 10;
+  probe.textContent = 'بب';
+  const w0 = probe.offsetWidth;
+  probe.textContent = 'ب' + 'ـ'.repeat(20) + 'ب';
+  const kw = (probe.offsetWidth - w0) / 20;
   probe.remove();
   if (!kw) return;
   // One place per word: the last join in it (never between lam and alef, which form one ligature).
@@ -409,9 +417,10 @@ function kashida(line, room) {
   // original text so a re-fit (rotating the phone) starts from clean text.
   const orig = new Map(spots.map(([n]) => [n, n.data]));
   let need = Math.floor(room * 0.9 / kw);
-  for (let tries = 0; tries < 4 && need >= 1; tries++) {
-    // Spread evenly over the words, at most 4 per word.
-    const count = spots.map((_, i) => Math.min(4, Math.floor(need * (i + 1) / spots.length) - Math.floor(need * i / spots.length)));
+  for (let tries = 0; tries < 10 && need >= 1; tries++) {
+    // Spread evenly over the words: normally at most 4 per word, more on a line with few words.
+    const cap = Math.max(4, Math.ceil(need / spots.length));
+    const count = spots.map((_, i) => Math.min(cap, Math.floor(need * (i + 1) / spots.length) - Math.floor(need * i / spots.length)));
     for (let i = spots.length - 1; i >= 0; i--) {
       const [n, at] = spots[i];
       if (count[i]) n.data = n.data.slice(0, at) + 'ـ'.repeat(count[i]) + n.data.slice(at);
@@ -421,7 +430,7 @@ function kashida(line, room) {
     box.classList.remove('measure');
     if (w <= limit) { line._kd = [...orig]; return; }
     orig.forEach((d, n) => { n.data = d; });  // a little too wide: undo and try with fewer
-    need = Math.floor(need * 0.75);
+    need = Math.floor(need * 0.9);
   }
 }
 // Re-fit whenever the reading area really changes size (rotating the phone, browser bars showing or
