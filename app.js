@@ -255,8 +255,10 @@ function pageHTML({ p, ayahs, lines, surahs, tj }, off) {
 // whole spread fills the screen height. A+ / A− make it larger or smaller from there.
 const BASE_FS = 1.9;
 const LINE_EM = 19.5;          // a full printed Mushaf line is about 19.5 em wide in the Hafs font
-function fitPage() {
+function fitPage(shrink) {
+  shrink = typeof shrink === 'number' ? shrink : 1;   // < 1 only on the safety re-run below
   const book = $('book'), reader = $('reader');
+  const side = innerWidth > innerHeight;               // a phone held sideways (landscape)
   const parts = bookPages().map(pg => ({ pg, box: pg.querySelector('.text'), ls: [...pg.querySelectorAll('.line')] }))
     .filter(x => x.box && x.ls.length);
   if (!parts.length) return;
@@ -283,7 +285,7 @@ function fitPage() {
     if (!widest || room < 50) { book.style.minHeight = ''; return; }   // not laid out yet
     frameW = x.pg.offsetWidth - room;
     const k = room / widest * 0.98;                                   // fit the width
-    fitW = Math.min(fitW, fs * k);                                    // largest size whose lines fit
+    fitW = Math.min(fitW, fs * k * shrink);                           // largest size whose lines fit
   }
   const setSize = s => parts.forEach(x => { x.box.style.fontSize = s.toFixed(3) + 'rem'; });
   // One page (phone): the normal page fits the screen. A+ / A− scale the text from there. A phone's
@@ -305,8 +307,11 @@ function fitPage() {
     }
     widthSize = want;
   } else {
-    widthSize = Math.min(BASE_FS, fitW) * Math.min(1, zoom);
-    const want = Math.min(BASE_FS, fitW) * zoom;
+    // Held sideways, the page fills the whole screen width (no empty space on both sides) and
+    // scrolls down; upright, the whole page fits on the screen.
+    const base = side ? fitW : Math.min(BASE_FS, fitW);
+    widthSize = base * Math.min(1, zoom);
+    const want = base * zoom;
     if (want > fitW * 1.01) {
       parts.forEach(x => x.box.classList.add('flow'));
       setSize(want);
@@ -321,7 +326,7 @@ function fitPage() {
   // frame stay the same size. On a very short screen (a phone held sideways) that would make the
   // text too small to read, so there the page keeps the width size and scrolls instead.
   const avail = reader.clientHeight - 8;
-  if (!spread && avail > 200) {
+  if (!spread && !side && avail > 200) {
     for (let n = 0; n < 3 && tallest().pg.offsetHeight > avail; n++) {
       const x = tallest(), textH = x.box.offsetHeight, fixedH = x.pg.offsetHeight - textH;
       size *= Math.max(0.3, (avail - fixedH) / textH) * 0.99;
@@ -356,6 +361,10 @@ function fitPage() {
       kashida(l, full - after[i]);
     });
   }
+  // Safety: a printed line must never stick out of its page (on Android that made the page slide
+  // left and right). If one does, fit again a little smaller.
+  const worst = Math.max(...parts.map(x => Math.max(...x.ls.map(l => l.scrollWidth / Math.max(1, x.box.clientWidth)))));
+  if (worst > 1.005 && shrink > 0.7) fitPage(shrink * 0.99 / worst);
 }
 // Letters that join to the next letter, combining marks, and letters that can be joined to.
 const KD_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', KD_MARK = /[ً-ٰٟۖ-ۭ]/,
@@ -429,7 +438,12 @@ if (window.ResizeObserver) {
     if (Math.abs(width - lastW) > 1 || Math.abs(height - lastH) > 1) { lastW = width; lastH = height; refit(); }
   }).observe($('reader'));
 }
-if (document.fonts) document.fonts.ready.then(fitPage);
+if (document.fonts) {
+  document.fonts.ready.then(() => fitPage());
+  // The Quran font can arrive after the page was first measured with a narrower stand-in font;
+  // measure again when it does, or the lines come out too wide for the screen.
+  document.fonts.addEventListener('loadingdone', refit);
+}
 
 // ---------- Tap handling ----------
 // The big circle at the top opens and closes the menu with all the buttons.
