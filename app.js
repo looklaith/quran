@@ -283,9 +283,9 @@ function fitPage(shrink) {
     const widths = measure(x), widest = Math.max(0, ...widths);
     // A line with only a few words (e.g. the end of An-Nas) would get huge gaps if stretched to the
     // full width; the printed Mushaf lengthens letters instead, which browsers cannot do. Centre it.
-    // Only the last line of a surah stays short (centred); a short line inside a surah is stretched to
-    // the full width like every other line, as the printed Mushaf does (e.g. page 443 line 13).
-    x.ls.forEach((l, i) => l.classList.toggle('short', l.classList.contains('last') && widths[i] < widest * 0.65));
+    // Every line is stretched to the full width, as the printed Mushaf does (e.g. page 443 line 13,
+    // page 417 line 14). Only a very short last line of a surah (e.g. the end of An-Nas) stays centred.
+    x.ls.forEach((l, i) => l.classList.toggle('short', l.classList.contains('last') && widths[i] < widest * 0.5));
     const room = x.box.clientWidth;
     if (!widest || room < 50) { book.style.minHeight = ''; return; }   // not laid out yet
     frameW = x.pg.offsetWidth - room;
