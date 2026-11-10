@@ -96,6 +96,9 @@ button{border-radius:999px}
 #fontBtns{position:fixed;top:calc(6px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px}
 /* A phone held upright always shows the whole printed page, exactly fitted: no A+ / A− there. */
 @media (orientation:portrait) and (max-width:599px){#fPlus,#fMinus{display:none}}
+/* Phone upright (also the iPhone app): the page starts below the clock / notch, and a smaller ☰ sits in the
+   empty space between the two header boxes (app.js moves it there), so it never covers the first line. */
+@media (orientation:portrait) and (max-width:599px){body #reader{padding-top:calc(4px + env(safe-area-inset-top))}body #fontBtns #menuBtn{width:42px;height:42px;font-size:1.2rem;border-width:2px}}
 #fontBtns button{width:40px;height:40px;padding:0;border-radius:50%;font:bold 1rem/1 sans-serif;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2)}
 /* The big circle in the middle: tap it and all the buttons come down. */
 /* Full screen (laptop / desktop): a circle in the top corner, outside the book, and one in the menu. */

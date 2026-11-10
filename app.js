@@ -343,7 +343,8 @@ function fitPage(shrink) {
   // Fit the height too, so the whole page is on screen: only the text scales; header, footer and
   // frame stay the same size. On a very short screen (a phone held sideways) that would make the
   // text too small to read, so there the page keeps the width size and scrolls instead.
-  const avail = reader.clientHeight - 8;
+  const rs = getComputedStyle(reader);
+  const avail = reader.clientHeight - parseFloat(rs.paddingTop) - parseFloat(rs.paddingBottom);
   if (!spread && !side && avail > 200) {
     for (let n = 0; n < 3 && tallest().pg.offsetHeight > avail; n++) {
       const x = tallest(), textH = x.box.offsetHeight, fixedH = x.pg.offsetHeight - textH;
@@ -383,6 +384,11 @@ function fitPage(shrink) {
   // left and right). If one does, fit again a little smaller.
   const worst = Math.max(...parts.map(x => Math.max(...x.ls.map(l => l.scrollWidth / Math.max(1, x.box.clientWidth)))));
   if (worst > 1.005 && shrink > 0.7) fitPage(shrink * 0.99 / worst);
+  // Phone upright: put the ☰ circle in the middle of the header row (between the surah and juz boxes),
+  // so it never covers the first line of the page.
+  const fb = $("fontBtns"), ph = upright && parts[0].pg.querySelector(".phead");
+  if (ph) { const r = ph.getBoundingClientRect(); fb.style.top = Math.max(2, r.top + r.height / 2 - 21) + "px"; }
+  else fb.style.top = "";
 }
 // Letters that join to the next letter, combining marks, and letters that can be joined to.
 const KD_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', KD_MARK = /[ً-ٰٟۖ-ۭ]/,
