@@ -32,6 +32,9 @@ button:hover{border-color:var(--accent)}
 #book.spread{gap:6px;padding:0 8px}
 #book.spread .page:first-child{--spine:inset 22px 0 26px -20px rgba(0,0,0,.38)}
 #book.spread .page:last-child{--spine:inset -22px 0 26px -20px rgba(0,0,0,.38)}
+/* The A− ☰ A+ buttons sit over the spine, so keep each page's inner header box clear of them. */
+#book.spread .page:first-child .phead{padding-left:62px}
+#book.spread .page:last-child .phead{padding-right:62px}
 /* Turning a page of the open book: a leaf lifts at the spine and turns over to the other side. */
 #flip{position:fixed;inset:0;z-index:15;pointer-events:none;perspective:2400px}
 #flip>div{position:absolute}
