@@ -99,12 +99,21 @@ function parseModelJson(text) {
 
 module.exports = async (req, res) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   // Browsers always send Origin on a POST like ours, so a missing Origin means a script, not the app.
   // (A determined attacker can fake this header; the rate limit below is the real protection.)
+  // capacitor://localhost is the iPhone app, which carries the site inside it and calls this server from there.
   const origin = req.headers.origin || '';
-  const okOrigin = /^https:\/\/([a-z0-9-]+\.)?laithissa\.online$/.test(origin) || /^https:\/\/quran-rust-chi\.vercel\.app$/.test(origin);
+  const fromApp = origin === 'capacitor://localhost';
+  const okOrigin = fromApp || /^https:\/\/([a-z0-9-]+\.)?laithissa\.online$/.test(origin) || /^https:\/\/quran-rust-chi\.vercel\.app$/.test(origin);
+  if (fromApp) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Vary', 'Origin');
+    if (req.method === 'OPTIONS') return res.status(204).end();
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!okOrigin) return res.status(403).json({ error: 'Not allowed.' });
 
   const key = process.env.GEMINI_API_KEY;

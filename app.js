@@ -837,12 +837,39 @@ setTurn(store.get('turn'));
 loadPage(parseInt(store.get('lastPage')) || 1, { noAnim: true });
 
 // ---------- Ask the assistant (typed box + voice share one endpoint) ----------
+// On the website the assistant is at /api/ask. The iPhone app carries the site inside it
+// (capacitor://localhost), so it has to call the website's server by its full address.
+const ASK_URL = location.protocol.startsWith('http') ? '/api/ask' : 'https://www.laithissa.online/api/ask';
+
+// Ask once before the first question is sent to Google Gemini (required by the App Store, fair on the web too).
+function aiConsent() {
+  if (store.get('aiOk') === '1') return Promise.resolve(true);
+  return new Promise(done => {
+    const bg = document.createElement('div');
+    bg.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    bg.innerHTML = `<div dir="rtl" style="max-width:420px;background:var(--page,#fff);color:var(--text,#222);border-radius:18px;padding:20px;font:16px/1.6 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.4)">
+      <b style="font-size:18px">المساعد الذكي</b>
+      <p style="margin:10px 0">للإجابة، يُرسل سؤالك ورقم الصفحة والآية المختارة إلى خادمنا ثم إلى خدمة <b>Google Gemini</b> للذكاء الاصطناعي. لا تكتب معلومات شخصية. للبالغين ١٨ سنة فأكثر.</p>
+      <p dir="ltr" style="margin:10px 0;font-size:14px;opacity:.85">To answer, your question, page and selected ayah are sent to our server and then to <b>Google Gemini</b> AI. Don't type personal information. Adults 18+ only.</p>
+      <a href="privacy.html" target="_blank" style="font-size:14px">سياسة الخصوصية · Privacy policy</a>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button data-ok style="flex:1;padding:12px;border:0;border-radius:999px;background:#3d7a55;color:#fff;font-size:16px">موافق · Agree</button>
+        <button data-no style="flex:1;padding:12px;border:0;border-radius:999px;background:#8884;color:inherit;font-size:16px">لا · No</button>
+      </div></div>`;
+    const end = ok => { bg.remove(); if (ok) store.set('aiOk', '1'); done(ok); };
+    bg.querySelector('[data-ok]').onclick = () => end(true);
+    bg.querySelector('[data-no]').onclick = () => end(false);
+    document.body.appendChild(bg);
+  });
+}
+
 async function askServer(q, useAyah) {
+  if (!await aiConsent()) throw new Error('لم يُرسل السؤال.');
   const body = { question: q, state: { page: S.page, surah: S.ayahs[0] ? S.ayahs[0].surah.number : null } };
   if (useAyah && S.sel >= 0) { const a = S.ayahs[S.sel]; body.surah = a.surah.number; body.ayah = a.numberInSurah; }
   let r, d;
   try {
-    r = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    r = await fetch(ASK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     d = await r.json();
   } catch (e) { throw new Error('تعذّر الاتصال. تحقق من الإنترنت.'); }
   if (!r.ok) throw new Error(d.error || 'حدث خطأ.');
@@ -940,7 +967,7 @@ $('vx').onclick = () => {
 };
 
 // ---------- Offline / install ----------
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   // An iPhone home-screen app is usually resumed from memory, not reloaded, so it would keep
   // showing the old version. Look for a new version every time the app comes back on screen,
   // and reload once when it is installed (not while a recitation is playing).
