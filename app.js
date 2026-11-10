@@ -92,22 +92,32 @@ function joinAcrossTags(html) {
   }
   return out.join('');
 }
+// Tajweed words for a page as [["line:verseId", raw], ...]. Saved copies in data/tj/ work with no internet
+// (built from api.quran.com); if one is missing, ask quran.com directly.
+function tajweedRows(p) {
+  return json('/data/tj/' + p + '.json').catch(() =>
+    fetch('https://api.quran.com/api/v4/verses/by_page/' + p + '?words=true&per_page=50&word_fields=text_uthmani_tajweed,line_number')
+      .then(r => r.json()).then(d => {
+        const rows = [];
+        d.verses.forEach(v => v.words.forEach(w => {
+          if (w.char_type_name === 'word') rows.push([w.line_number + ':' + v.id, w.text_uthmani_tajweed]);   // we draw our own ayah number
+        }));
+        return rows;
+      }));
+}
 function tajweed(p) {
   if (!tjCache[p]) {
-    tjCache[p] = fetch('https://api.quran.com/api/v4/verses/by_page/' + p + '?words=true&per_page=50&word_fields=text_uthmani_tajweed,line_number')
-      .then(r => r.json()).then(d => {
-        const m = {};
-        d.verses.forEach(v => v.words.forEach(w => {
-          if (w.char_type_name !== 'word') return;          // we draw our own ayah number
-          // Escape everything, then bring back ONLY plain <rule class=name> tags. Any other HTML stays harmless text.
-          const html = esc(w.text_uthmani_tajweed)
-            .replace(/&lt;rule class=(?:&quot;)?([a-z_-]+)(?:&quot;)?&gt;/g, '<tajweed class="$1">')
-            .replace(/&lt;\/rule&gt;/g, '</tajweed>');
-          const k = w.line_number + ':' + v.id;
-          (m[k] = m[k] || []).push(html);           // one entry per word, in order
-        }));
-        return m;
-      }).catch(e => { delete tjCache[p]; throw e; });
+    tjCache[p] = tajweedRows(p).then(rows => {
+      const m = {};
+      rows.forEach(([k, raw]) => {
+        // Escape everything, then bring back ONLY plain <rule class=name> tags. Any other HTML stays harmless text.
+        const html = esc(raw)
+          .replace(/&lt;rule class=(?:&quot;)?([a-z_-]+)(?:&quot;)?&gt;/g, '<tajweed class="$1">')
+          .replace(/&lt;\/rule&gt;/g, '</tajweed>');
+        (m[k] = m[k] || []).push(html);           // one entry per word, in order
+      });
+      return m;
+    }).catch(e => { delete tjCache[p]; throw e; });
   }
   return tjCache[p];
 }
