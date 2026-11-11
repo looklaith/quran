@@ -176,7 +176,7 @@ body.tj #legend.show{display:block}
 #legend i{display:inline-block;width:.9em;height:.9em;border-radius:50%;vertical-align:middle;margin-inline:4px 4px}
 #ask{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
 #ask .line{display:flex;gap:6px}
-#ask input{flex:1;min-width:0}
+#ask input{flex:1;min-width:0;text-align:start;text-align-last:auto}
 #ans{margin-top:10px;line-height:1.9;white-space:pre-wrap}
 #ans.err{color:#b3201f}
 #ask small.note{display:block;margin-top:8px;opacity:.7;color:inherit}
@@ -215,28 +215,28 @@ body.tj #legend.show{display:block}
 </main>
 <div id="flip"></div>
 
-<div id="fontBtns"><button id="fPlus" title="تكبير الخط">A+</button><button id="menuBtn" title="القائمة" aria-expanded="false" aria-controls="menu">☰</button><button id="fMinus" title="تصغير الخط">A−</button></div>
+<div id="fontBtns"><button id="fPlus" data-tt="bigger" title="تكبير الخط">A+</button><button id="menuBtn" data-tt="menu" title="القائمة" aria-expanded="false" aria-controls="menu">☰</button><button id="fMinus" data-tt="smaller" title="تصغير الخط">A−</button></div>
 <button id="fsTop" class="fsBtn" title="ملء الشاشة (F)">⛶</button>
 
 <!-- All the buttons live in this round menu; the big circle at the top opens and closes it. -->
-<nav id="menu" aria-label="القائمة">
+<nav id="menu" data-ta="menu" aria-label="القائمة">
   <div id="lbl"></div>
   <div class="row">
-    <label class="it"><button id="prev" title="الصفحة السابقة">▶</button><span>السابقة</span></label>
-    <label class="it"><input id="pg" type="number" min="1" max="604" aria-label="رقم الصفحة"><span>الصفحة</span></label>
-    <label class="it"><button id="next" title="الصفحة التالية">◀</button><span>التالية</span></label>
+    <label class="it"><button id="prev" data-tt="prevT" title="الصفحة السابقة">▶</button><span data-t="prev">السابقة</span></label>
+    <label class="it"><input id="pg" type="number" min="1" max="604" data-ta="pageNo" aria-label="رقم الصفحة"><span data-t="page">الصفحة</span></label>
+    <label class="it"><button id="next" data-tt="nextT" title="الصفحة التالية">◀</button><span data-t="next">التالية</span></label>
   </div>
   <div class="row">
-    <label class="it"><button id="play" title="تشغيل">▶</button><span>تشغيل</span></label>
-    <label class="it"><button id="stop" title="إيقاف">■</button><span>إيقاف</span></label>
-    <label class="it"><button id="repBtn" title="تكرار الآيات" aria-expanded="false">🔁</button><span>تكرار</span></label>
-    <label class="it"><button class="mic" id="micBar" title="تحدث">🎤</button><span>تحدث</span></label>
+    <label class="it"><button id="play" data-tt="play" title="تشغيل">▶</button><span data-t="play">تشغيل</span></label>
+    <label class="it"><button id="stop" data-tt="stop" title="إيقاف">■</button><span data-t="stop">إيقاف</span></label>
+    <label class="it"><button id="repBtn" data-tt="repT" title="تكرار الآيات" aria-expanded="false">🔁</button><span data-t="rep">تكرار</span></label>
+    <label class="it"><button class="mic" id="micBar" data-tt="speak" title="تحدث">🎤</button><span data-t="speak">تحدث</span></label>
   </div>
   <div class="row">
-    <label class="it"><button id="openList" title="السور">📜</button><span>السور</span></label>
-    <label class="it"><button id="turnBtn" title="طريقة تقليب الصفحات">📖</button><span>التقليب</span></label>
-    <label class="it"><button id="theme" title="الألوان">◐</button><span>الألوان</span></label>
-    <label class="it"><button id="vl" title="لغة الصوت">ع</button><span>اللغة</span></label>
+    <label class="it"><button id="openList" data-tt="surahs" title="السور">📜</button><span data-t="surahs">السور</span></label>
+    <label class="it"><button id="turnBtn" title="طريقة تقليب الصفحات">📖</button><span data-t="turn">التقليب</span></label>
+    <label class="it"><button id="theme" data-tt="colors" title="الألوان">◐</button><span data-t="colors">الألوان</span></label>
+    <label class="it"><button id="vl" data-tt="vlT" title="لغة الصوت">ع</button><span data-t="vl">اللغة</span></label>
   </div>
   <div class="row fsItem">
     <label class="it"><button id="fsMenu" class="fsBtn" title="ملء الشاشة (F)">⛶</button><span>ملء الشاشة</span></label>
@@ -245,47 +245,47 @@ body.tj #legend.show{display:block}
 
 <section id="sheet">
   <div class="row"><b id="ref"></b>
-    <span class="grp"><button class="mic" id="micSheet" title="تحدث">🎤</button><button id="sp">▶ استمع من هنا</button><button id="sx">✕</button></span>
+    <span class="grp"><button class="mic" id="micSheet" data-tt="speak" title="تحدث">🎤</button><button id="sp" data-t="listen">▶ استمع من هنا</button><button id="sx" data-tt="close">✕</button></span>
   </div>
   <div id="tr"></div>
-  <small>التفسير الميسر</small>
-  <div id="tf"></div>
+  <small data-t="tafsir">التفسير الميسر</small>
+  <div id="tf" dir="rtl" lang="ar"></div>
   <div id="ask">
-    <small>اسأل عن هذه الآية</small>
+    <small data-t="askL">اسأل عن هذه الآية</small>
     <div class="line">
-      <input id="aq" maxlength="300" placeholder="اكتب سؤالك عن هذه الآية...">
-      <button id="ab">اسأل</button>
+      <input id="aq" maxlength="300" data-tp="askPh" placeholder="اكتب سؤالك عن هذه الآية...">
+      <button id="ab" data-t="ask">اسأل</button>
     </div>
     <div id="ans"></div>
-    <small class="note">إجابة آلية مبنية على تفسير الميسر فقط، وقد تخطئ. للفتاوى راجع أهل العلم.</small>
+    <small class="note" data-t="askNote">إجابة آلية مبنية على تفسير الميسر فقط، وقد تخطئ. للفتاوى راجع أهل العلم.</small>
   </div>
 </section>
 
-<section id="repPanel" aria-label="تكرار الآيات">
-  <div class="row"><b>تكرار الآيات</b><button id="repX" title="إغلاق">✕</button></div>
-  <small>عدد مرات تكرار كل آية</small>
+<section id="repPanel" data-ta="repT" aria-label="تكرار الآيات">
+  <div class="row"><b data-t="repT">تكرار الآيات</b><button id="repX" data-tt="close" title="إغلاق">✕</button></div>
+  <small data-t="repCount">عدد مرات تكرار كل آية</small>
   <div id="repPresets">
     <button data-n="1">بدون</button><button data-n="3">٣</button><button data-n="5">٥</button>
     <button data-n="10">١٠</button><button data-n="20">٢٠</button><button data-n="50">٥٠</button>
   </div>
-  <label class="line2">عدد آخر: <input id="repN" type="number" min="1" max="999" inputmode="numeric"></label>
-  <label class="line2"><input id="repNext" type="checkbox"> الانتقال تلقائياً إلى الآية التالية بعد انتهاء التكرار</label>
+  <label class="line2"><span data-t="repOther">عدد آخر:</span> <input id="repN" type="number" min="1" max="999" inputmode="numeric"></label>
+  <label class="line2"><input id="repNext" type="checkbox"> <span data-t="repNext">الانتقال تلقائياً إلى الآية التالية بعد انتهاء التكرار</span></label>
   <div id="repStat" role="status" aria-live="polite"></div>
-  <div class="row"><button id="repPlay" class="big">▶ تشغيل التكرار</button><button id="repStop" class="big">■ إيقاف</button></div>
-  <small class="note">يبدأ من الآية المحددة، أو من أول آية في الصفحة. يعمل مع جميع القرّاء.</small>
+  <div class="row"><button id="repPlay" class="big" data-t="repPlay">▶ تشغيل التكرار</button><button id="repStop" class="big" data-t="repStop">■ إيقاف</button></div>
+  <small class="note" data-t="repNote">يبدأ من الآية المحددة، أو من أول آية في الصفحة. يعمل مع جميع القرّاء.</small>
 </section>
 
-<div id="vp" role="status" aria-live="polite"><button class="x" id="vx" title="إغلاق">✕</button><div class="you" id="vyou"></div><div class="bot" id="vbot"></div></div>
+<div id="vp" role="status" aria-live="polite"><button class="x" id="vx" data-tt="close" title="إغلاق">✕</button><div class="you" id="vyou"></div><div class="bot" id="vbot"></div></div>
 
 <aside id="drawer">
   <div class="set">
-    <button id="closeList">✕ إغلاق</button>
+    <button id="closeList" data-t="closeX">✕ إغلاق</button>
     <select id="trSel">
       <option value="en.sahih">English</option>
       <option value="fr.hamidullah">Français</option>
       <option value="ur.jalandhry">اردو</option>
       <option value="tr.diyanet">Türkçe</option>
-      <option value="none">بدون ترجمة</option>
+      <option value="none" data-t="trNone">العربية (بدون ترجمة)</option>
     </select>
     <select id="rec">
       <option value="ar.alafasy" data-br="128">مشاري العفاسي</option>
@@ -295,29 +295,29 @@ body.tj #legend.show{display:block}
       <option value="ar.abdurrahmaansudais" data-br="64">السديس</option>
       <option value="ar.aymansowaid" data-ea="Ayman_Sowaid_64kbps">أيمن سويد</option>
     </select>
-    <select id="turnSel" title="طريقة تقليب الصفحات">
+    <select id="turnSel" data-tt="turnT" title="طريقة تقليب الصفحات">
       <option value="flip">تقليب الصفحات: قلب الصفحة</option>
       <option value="slide">تقليب الصفحات: سحب يمين / يسار</option>
       <option value="scroll">تقليب الصفحات: تمرير لأسفل</option>
     </select>
     <button id="tjBtn" aria-pressed="false">التجويد: إيقاف</button>
     <button id="awakeBtn" aria-pressed="true">☀ إبقاء الشاشة مضاءة: تشغيل</button>
-    <button id="lgBtn" style="display:none">دليل الألوان</button>
+    <button id="lgBtn" style="display:none" data-t="legendBtn">دليل الألوان</button>
     <div id="legend">
-      <div><i style="background:#d4571a"></i>مد طبيعي</div>
-      <div><i style="background:#e08a00"></i>مد جائز</div>
-      <div><i style="background:#b3201f"></i>مد لازم / واجب</div>
-      <div><i style="background:#2f6fd0"></i>قلقلة</div>
-      <div><i style="background:#c2307a"></i>إخفاء</div>
-      <div><i style="background:#1a9aa0"></i>إقلاب</div>
-      <div><i style="background:#2e9b4d"></i>إدغام</div>
-      <div><i style="background:#e0457b"></i>غنة</div>
-      <div><i style="background:#9a9a9a"></i>لا يُنطق</div>
+      <div><i style="background:#d4571a"></i><span data-t="lg0">مد طبيعي</span></div>
+      <div><i style="background:#e08a00"></i><span data-t="lg1">مد جائز</span></div>
+      <div><i style="background:#b3201f"></i><span data-t="lg2">مد لازم / واجب</span></div>
+      <div><i style="background:#2f6fd0"></i><span data-t="lg3">قلقلة</span></div>
+      <div><i style="background:#c2307a"></i><span data-t="lg4">إخفاء</span></div>
+      <div><i style="background:#1a9aa0"></i><span data-t="lg5">إقلاب</span></div>
+      <div><i style="background:#2e9b4d"></i><span data-t="lg6">إدغام</span></div>
+      <div><i style="background:#e0457b"></i><span data-t="lg7">غنة</span></div>
+      <div><i style="background:#9a9a9a"></i><span data-t="lg8">لا يُنطق</span></div>
     </div>
-    <input id="q" placeholder="ابحث عن سورة...">
+    <input id="q" data-tp="search" placeholder="ابحث عن سورة...">
   </div>
   <ul id="list"></ul>
-  <a class="priv" href="/privacy.html">سياسة الخصوصية · Privacy</a>
+  <a class="priv" href="/privacy.html" data-t="privacy">سياسة الخصوصية · Privacy</a>
 </aside>
 
 <script src="/app.js" defer></script>

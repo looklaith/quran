@@ -14,6 +14,121 @@ const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 // Text from outside APIs is never trusted as HTML: turn < > & " into harmless characters first.
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// ---------- App language ----------
+// The language picked in the translation list (☰ → 📜) is also the language of every button, caption and
+// message. "العربية (بدون ترجمة)" = Arabic. The Mushaf pages themselves always stay Arabic.
+// Each entry: [Arabic, English, Français, اردو, Türkçe]. A function entry gets extra values (numbers, names).
+const LANGS = ['ar', 'en', 'fr', 'ur', 'tr'];
+const LANG_OF = { 'en.sahih': 'en', 'fr.hamidullah': 'fr', 'ur.jalandhry': 'ur', 'tr.diyanet': 'tr', none: 'ar' };
+let L = 'ar';
+const I18N = {
+  title: ['مصحفي', 'Mushafi', 'Mushafi', 'مصحفی', 'Mushafi'],
+  menu: ['القائمة', 'Menu', 'Menu', 'مینو', 'Menü'],
+  bigger: ['تكبير الخط', 'Larger text', 'Agrandir le texte', 'متن بڑا کریں', 'Yazıyı büyüt'],
+  smaller: ['تصغير الخط', 'Smaller text', 'Réduire le texte', 'متن چھوٹا کریں', 'Yazıyı küçült'],
+  prevT: ['الصفحة السابقة', 'Previous page', 'Page précédente', 'پچھلا صفحہ', 'Önceki sayfa'],
+  prev: ['السابقة', 'Previous', 'Précédente', 'پچھلا', 'Önceki'],
+  pageNo: ['رقم الصفحة', 'Page number', 'Numéro de page', 'صفحہ نمبر', 'Sayfa numarası'],
+  page: ['الصفحة', 'Page', 'Page', 'صفحہ', 'Sayfa'],
+  nextT: ['الصفحة التالية', 'Next page', 'Page suivante', 'اگلا صفحہ', 'Sonraki sayfa'],
+  next: ['التالية', 'Next', 'Suivante', 'اگلا', 'Sonraki'],
+  play: ['تشغيل', 'Play', 'Lecture', 'چلائیں', 'Oynat'],
+  stop: ['إيقاف', 'Stop', 'Arrêt', 'روکیں', 'Durdur'],
+  repT: ['تكرار الآيات', 'Repeat ayahs', 'Répéter les versets', 'آیات دہرائیں', 'Ayetleri tekrarla'],
+  rep: ['تكرار', 'Repeat', 'Répéter', 'دہرائیں', 'Tekrar'],
+  speak: ['تحدث', 'Speak', 'Parler', 'بولیں', 'Konuş'],
+  surahs: ['السور', 'Surahs', 'Sourates', 'سورتیں', 'Sureler'],
+  turnT: ['طريقة تقليب الصفحات', 'Page turn style', 'Façon de tourner les pages', 'صفحہ پلٹنے کا انداز', 'Sayfa çevirme şekli'],
+  turn: ['التقليب', 'Turning', 'Tourner', 'پلٹنا', 'Çevirme'],
+  colors: ['الألوان', 'Colours', 'Couleurs', 'رنگ', 'Renkler'],
+  vlT: ['لغة الصوت', 'Voice language', 'Langue de la voix', 'آواز کی زبان', 'Ses dili'],
+  vl: ['اللغة', 'Voice', 'Voix', 'آواز', 'Ses'],
+  fs: ['ملء الشاشة', 'Full screen', 'Plein écran', 'پوری اسکرین', 'Tam ekran'],
+  fsExit: ['خروج من ملء الشاشة', 'Exit full screen', 'Quitter le plein écran', 'پوری اسکرین بند کریں', 'Tam ekrandan çık'],
+  listen: ['▶ استمع من هنا', '▶ Listen from here', '▶ Écouter d’ici', '▶ یہاں سے سنیں', '▶ Buradan dinle'],
+  close: ['إغلاق', 'Close', 'Fermer', 'بند کریں', 'Kapat'],
+  closeX: ['✕ إغلاق', '✕ Close', '✕ Fermer', '✕ بند کریں', '✕ Kapat'],
+  tafsir: ['التفسير الميسر', 'Tafsir Al-Muyassar (Arabic)', 'Tafsir Al-Muyassar (en arabe)', 'تفسیر میسر (عربی)', 'El-Müyesser tefsiri (Arapça)'],
+  askL: ['اسأل عن هذه الآية', 'Ask about this ayah', 'Une question sur ce verset', 'اس آیت کے بارے میں پوچھیں', 'Bu ayet hakkında sor'],
+  askPh: ['اكتب سؤالك عن هذه الآية...', 'Type your question about this ayah...', 'Écrivez votre question sur ce verset...', 'اس آیت کے بارے میں اپنا سوال لکھیں...', 'Bu ayet hakkındaki sorunuzu yazın...'],
+  ask: ['اسأل', 'Ask', 'Demander', 'پوچھیں', 'Sor'],
+  askNote: ['إجابة آلية مبنية على تفسير الميسر فقط، وقد تخطئ. للفتاوى راجع أهل العلم.',
+    'An automatic answer based only on Tafsir Al-Muyassar; it can be wrong. For religious rulings, ask a qualified scholar.',
+    'Réponse automatique fondée uniquement sur le Tafsir Al-Muyassar ; elle peut se tromper. Pour les avis religieux, consultez un savant.',
+    'یہ خودکار جواب صرف تفسیر میسر پر مبنی ہے اور غلط ہو سکتا ہے۔ فتویٰ کے لیے اہلِ علم سے رجوع کریں۔',
+    'Yalnızca El-Müyesser tefsirine dayanan otomatik bir cevaptır, hatalı olabilir. Dini hükümler için bir âlime danışın.'],
+  repCount: ['عدد مرات تكرار كل آية', 'How many times to repeat each ayah', 'Nombre de répétitions de chaque verset', 'ہر آیت کتنی بار دہرائی جائے', 'Her ayet kaç kez tekrarlansın'],
+  repNone: ['بدون', 'None', 'Aucune', 'کوئی نہیں', 'Yok'],
+  repOther: ['عدد آخر:', 'Other number:', 'Autre nombre :', 'دوسری تعداد:', 'Başka sayı:'],
+  repNext: ['الانتقال تلقائياً إلى الآية التالية بعد انتهاء التكرار', 'Go on to the next ayah when the repeats are done',
+    'Passer au verset suivant après les répétitions', 'تکرار ختم ہونے پر خودبخود اگلی آیت پر جائیں', 'Tekrar bitince sonraki ayete geç'],
+  repPlay: ['▶ تشغيل التكرار', '▶ Play repeat', '▶ Lancer la répétition', '▶ تکرار چلائیں', '▶ Tekrarı başlat'],
+  repStop: ['■ إيقاف', '■ Stop', '■ Arrêt', '■ روکیں', '■ Durdur'],
+  repNote: ['يبدأ من الآية المحددة، أو من أول آية في الصفحة. يعمل مع جميع القرّاء.',
+    'Starts from the selected ayah, or the first ayah on the page. Works with every reciter.',
+    'Commence au verset choisi, ou au premier verset de la page. Fonctionne avec tous les récitateurs.',
+    'منتخب آیت سے، یا صفحے کی پہلی آیت سے شروع ہوتا ہے۔ سب قاریوں کے ساتھ چلتا ہے۔',
+    'Seçilen ayetten veya sayfanın ilk ayetinden başlar. Bütün kârilerle çalışır.'],
+  repEach: [n => `كل آية ستُكرَّر ${n} مرة.`, n => `Each ayah will be repeated ${n} times.`, n => `Chaque verset sera répété ${n} fois.`,
+    n => `ہر آیت ${n} بار دہرائی جائے گی۔`, n => `Her ayet ${n} kez tekrarlanacak.`],
+  repOff: ['بدون تكرار (قراءة عادية).', 'No repeat (normal reading).', 'Pas de répétition (lecture normale).', 'کوئی تکرار نہیں (عام تلاوت)۔', 'Tekrar yok (normal okuma).'],
+  repNow: [(r, n, m) => `${r} — التكرار ${n} من ${m}`, (r, n, m) => `${r} — repeat ${n} of ${m}`, (r, n, m) => `${r} — répétition ${n} sur ${m}`,
+    (r, n, m) => `${r} — تکرار ${n} از ${m}`, (r, n, m) => `${r} — tekrar ${n} / ${m}`],
+  trNone: ['العربية (بدون ترجمة)', 'Arabic (no translation)', 'Arabe (sans traduction)', 'عربی (بغیر ترجمہ)', 'Arapça (çevirisiz)'],
+  turnPre: ['تقليب الصفحات: ', 'Page turn: ', 'Tourner les pages : ', 'صفحہ پلٹنا: ', 'Sayfa çevirme: '],
+  flip: ['قلب الصفحة', 'Page flip', 'Feuilleter', 'صفحہ پلٹیں', 'Sayfa çevir'],
+  slide: ['سحب يمين / يسار', 'Slide left / right', 'Glisser gauche / droite', 'دائیں / بائیں کھسکائیں', 'Sağa / sola kaydır'],
+  scroll: ['تمرير لأسفل', 'Scroll down', 'Défiler vers le bas', 'نیچے اسکرول کریں', 'Aşağı kaydır'],
+  tj: ['التجويد: ', 'Tajweed: ', 'Tajwid : ', 'تجوید: ', 'Tecvid: '],
+  awake: ['☀ إبقاء الشاشة مضاءة: ', '☀ Keep screen on: ', '☀ Écran toujours allumé : ', '☀ اسکرین روشن رکھیں: ', '☀ Ekranı açık tut: '],
+  on: ['تشغيل', 'On', 'Activé', 'آن', 'Açık'],
+  off: ['إيقاف', 'Off', 'Désactivé', 'آف', 'Kapalı'],
+  legendBtn: ['دليل الألوان', 'Colour guide', 'Guide des couleurs', 'رنگوں کی رہنمائی', 'Renk rehberi'],
+  lg0: ['مد طبيعي', 'Natural madd', 'Madd naturel', 'مدِ طبعی', 'Tabii med'],
+  lg1: ['مد جائز', 'Permissible madd', 'Madd permis', 'مدِ جائز', 'Caiz med'],
+  lg2: ['مد لازم / واجب', 'Necessary / obligatory madd', 'Madd nécessaire / obligatoire', 'مدِ لازم / واجب', 'Lazım / vacip med'],
+  lg3: ['قلقلة', 'Qalqalah', 'Qalqala', 'قلقلہ', 'Kalkale'],
+  lg4: ['إخفاء', 'Ikhfa', 'Ikhfa', 'اخفاء', 'İhfa'],
+  lg5: ['إقلاب', 'Iqlab', 'Iqlab', 'اقلاب', 'İklab'],
+  lg6: ['إدغام', 'Idgham', 'Idgham', 'ادغام', 'İdgam'],
+  lg7: ['غنة', 'Ghunnah', 'Ghunna', 'غنہ', 'Gunne'],
+  lg8: ['لا يُنطق', 'Not pronounced', 'Non prononcé', 'نہیں پڑھا جاتا', 'Okunmaz'],
+  search: ['ابحث عن سورة...', 'Search for a surah...', 'Chercher une sourate...', 'سورت تلاش کریں...', 'Sure ara...'],
+  privacy: ['سياسة الخصوصية · Privacy', 'Privacy policy', 'Politique de confidentialité', 'رازداری کی پالیسی · Privacy', 'Gizlilik politikası'],
+  loadErr: ['⚠️ تعذّر التحميل. تحقق من الإنترنت.', '⚠️ Could not load. Check your internet.', '⚠️ Chargement impossible. Vérifiez Internet.',
+    '⚠️ لوڈ نہیں ہو سکا۔ انٹرنیٹ چیک کریں۔', '⚠️ Yüklenemedi. İnternetinizi kontrol edin.'],
+  listErr: ['⚠️ تعذّر التحميل', '⚠️ Could not load', '⚠️ Chargement impossible', '⚠️ لوڈ نہیں ہو سکا', '⚠️ Yüklenemedi'],
+  juz: ['الجزء', 'Juz', 'Juz', 'پارہ', 'Cüz'],
+  pageW: ['صفحة', 'Page', 'Page', 'صفحہ', 'Sayfa'],
+  bism: ['البسملة', 'Bismillah', 'Basmala', 'بسم اللہ', 'Besmele'],
+  audioOff: ['التلاوة الصوتية تحتاج إلى الإنترنت. القراءة تعمل بدونه.', 'Recitation audio needs the internet. Reading works without it.',
+    'L’audio de la récitation a besoin d’Internet. La lecture fonctionne sans.', 'تلاوت کی آواز کے لیے انٹرنیٹ چاہیے۔ پڑھنا اس کے بغیر بھی چلتا ہے۔',
+    'Tilavet sesi için internet gerekir. Okuma internetsiz de çalışır.'],
+  notSent: ['لم يُرسل السؤال.', 'The question was not sent.', 'La question n’a pas été envoyée.', 'سوال نہیں بھیجا گیا۔', 'Soru gönderilmedi.'],
+  connErr: ['تعذّر الاتصال. تحقق من الإنترنت.', 'Could not connect. Check your internet.', 'Connexion impossible. Vérifiez Internet.',
+    'رابطہ نہیں ہو سکا۔ انٹرنیٹ چیک کریں۔', 'Bağlanılamadı. İnternetinizi kontrol edin.'],
+  err: ['حدث خطأ.', 'Something went wrong.', 'Une erreur s’est produite.', 'کوئی خرابی ہو گئی۔', 'Bir hata oluştu.'],
+  done: ['تم.', 'Done.', 'C’est fait.', 'ہو گیا۔', 'Tamam.'],
+  noSR: ['المتصفح لا يدعم الأوامر الصوتية. جرّب Chrome أو Edge.', 'This browser does not support voice commands. Try Chrome or Edge.',
+    'Ce navigateur ne gère pas les commandes vocales. Essayez Chrome ou Edge.', 'یہ براؤزر آواز کے احکامات نہیں سمجھتا۔ Chrome یا Edge آزمائیں۔',
+    'Bu tarayıcı sesli komutları desteklemiyor. Chrome veya Edge deneyin.'],
+  micDenied: ['اسمح للمتصفح باستخدام الميكروفون.', 'Allow the browser to use the microphone.', 'Autorisez le navigateur à utiliser le micro.',
+    'براؤزر کو مائیکروفون استعمال کرنے کی اجازت دیں۔', 'Tarayıcının mikrofonu kullanmasına izin verin.'],
+  noSpeech: ['لم أسمع شيئًا. حاول مرة أخرى.', 'I did not hear anything. Try again.', 'Je n’ai rien entendu. Réessayez.', 'کچھ سنائی نہیں دیا۔ دوبارہ کوشش کریں۔', 'Bir şey duyamadım. Tekrar deneyin.'],
+  listenErr: ['تعذّر الاستماع. حاول مرة أخرى.', 'Could not listen. Try again.', 'Écoute impossible. Réessayez.', 'سن نہیں سکا۔ دوبارہ کوشش کریں۔', 'Dinlenemedi. Tekrar deneyin.'],
+  micErr: ['تعذّر تشغيل الميكروفون.', 'Could not start the microphone.', 'Impossible de démarrer le micro.', 'مائیکروفون شروع نہیں ہو سکا۔', 'Mikrofon başlatılamadı.']
+};
+// Reciter names in Latin letters for English, French and Turkish (Arabic and Urdu keep the Arabic names).
+const RECITERS = {
+  'ar.alafasy': ['Mishary Alafasy', 'Mişari el-Afasi'], 'ar.husary': ['Mahmoud Al-Husary', 'Mahmud el-Husari'],
+  'ar.minshawi': ['Al-Minshawi', 'el-Minşavi'], 'ar.abdulbasitmurattal': ['Abdul Basit', 'Abdulbasit Abdussamed'],
+  'ar.abdurrahmaansudais': ['As-Sudais', 'es-Sudeys'], 'ar.aymansowaid': ['Ayman Suwaid', 'Eymen Süveyd']
+};
+const loc = (k, ...a) => { const e = I18N[k]; if (!e) return k; const v = e[LANGS.indexOf(L)] ?? e[0]; return typeof v === 'function' ? v(...a) : v; };
+const rtlLang = () => L === 'ar' || L === 'ur';
+// Numbers in Arabic-Indic digits for Arabic and Urdu, normal digits for the other languages.
+const num = n => rtlLang() ? ar(n) : String(n);
+
 // ---------- Quran data ----------
 // The whole Quran, tafsir and translations ship with the app in /data, and the service worker
 // keeps them on the phone, so reading works with no internet.
@@ -143,7 +258,7 @@ async function loadPage(p, opts = {}) {
   const nums = spread ? [p, p + 1] : [p];
   let data;
   try { data = await Promise.all(nums.map(n => pageData(n, document.body.classList.contains('tj')))); }
-  catch (e) { if (id === S.loadId) $('book').innerHTML = '<div class="page"><div class="text"><div class="msg">⚠️ تعذّر التحميل. تحقق من الإنترنت.</div></div></div>'; return; }
+  catch (e) { if (id === S.loadId) $('book').innerHTML = '<div class="page"><div class="text"><div class="msg">' + esc(loc('loadErr')) + '</div></div></div>'; return; }
   if (id !== S.loadId) return;
 
   // Page turns play even with "reduce motion" on: the reader picks the turn style (📖) in the menu.
@@ -175,7 +290,7 @@ async function loadPage(p, opts = {}) {
   }
   const first = S.ayahs[0];
   $('pg').value = p;
-  $('lbl').textContent = `${first.surah.name} · الجزء ${ar(first.juz)} · صفحة ${ar(p)}${spread ? '–' + ar(p + 1) : ''}`;
+  setLbl();
   closeSheet();
   store.set('lastPage', p);
   if (opts.play) playFrom(0);
@@ -521,7 +636,7 @@ function selectAyah(i) {
   $('book').querySelectorAll('.ayah.sel').forEach(e => e.classList.remove('sel'));
   $('book').querySelectorAll(`.ayah[data-i="${i}"]`).forEach(e => e.classList.add('sel'));
   const a = S.ayahs[i];
-  $('ref').textContent = a.surah.number === 1 && a.numberInSurah === 1 ? `${a.surah.name} · البسملة` : `${a.surah.name} ﴿${ar(shownNo(a))}﴾`;
+  $('ref').textContent = refText(a);
   $('sheet').classList.add('open');
   $('ans').textContent = ''; $('aq').value = '';
   fill(i);
@@ -577,7 +692,7 @@ function playFrom(i, n = 1) {
   parts.forEach(e => e.classList.add('cur'));
   if (parts[0]) parts[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
   // Stop instead of silently skipping to the wrong ayah. Recitation is streamed, so say so when offline.
-  const fail = () => { stopAudio(); if (!navigator.onLine) showVoice('', 'التلاوة الصوتية تحتاج إلى الإنترنت. القراءة تعمل بدونه.', true); };
+  const fail = () => { stopAudio(); if (!navigator.onLine) showVoice('', loc('audioOff'), true); };
   S.playing = { i, n };
   showRep();
   au.onended = () => {
@@ -599,14 +714,13 @@ function playFrom(i, n = 1) {
 // ---------- Ayah repetition menu ----------
 function showRep() {
   const btn = $('repBtn');
-  btn.innerHTML = '🔁' + (S.rep > 1 ? `<b class="badge">${ar(S.rep)}</b>` : '');
+  btn.innerHTML = '🔁' + (S.rep > 1 ? `<b class="badge">${num(S.rep)}</b>` : '');
   btn.classList.toggle('on', S.rep > 1);
   document.querySelectorAll('#repPresets button').forEach(b => b.classList.toggle('on', +b.dataset.n === S.rep));
   if (document.activeElement !== $('repN')) $('repN').value = S.rep;
   $('repNext').checked = S.autoNext;
   const p = S.playing, a = p && S.ayahs[p.i];
-  $('repStat').textContent = !a ? (S.rep > 1 ? `كل آية ستُكرَّر ${ar(S.rep)} مرة.` : 'بدون تكرار (قراءة عادية).')
-    : `${a.surah.name} ﴿${ar(shownNo(a))}﴾ — التكرار ${ar(p.n)} من ${ar(S.rep)}`;
+  $('repStat').textContent = !a ? (S.rep > 1 ? loc('repEach', num(S.rep)) : loc('repOff')) : loc('repNow', refText(a), num(p.n), num(S.rep));
 }
 function setRep(n) {
   S.rep = Math.max(1, Math.min(999, parseInt(n) || 1));
@@ -656,11 +770,10 @@ function setTurn(t) {
   S.turn = TURNS.includes(t) ? t : 'flip';
   $('turnSel').value = S.turn;
   $('turnBtn').textContent = TURN_ICONS[S.turn];
-  $('turnBtn').title = 'تقليب الصفحات: ' + TURN_NAMES[S.turn];
+  $('turnBtn').title = loc('turnPre') + loc(S.turn);
   store.set('turn', S.turn);
 }
-const TURN_ICONS = { flip: '📖', slide: '↔', scroll: '↕' },
-      TURN_NAMES = { flip: 'قلب الصفحة', slide: 'سحب يمين / يسار', scroll: 'تمرير لأسفل' };
+const TURN_ICONS = { flip: '📖', slide: '↔', scroll: '↕' };
 $('turnSel').onchange = () => setTurn($('turnSel').value);
 // Top-bar button: each tap moves to the next way, and says which one is now on.
 let turnMsgTimer;
@@ -668,7 +781,7 @@ $('turnBtn').onclick = () => {
   setTurn(TURNS[(TURNS.indexOf(S.turn) + 1) % TURNS.length]);
   const lbl = $('lbl'), old = lbl.dataset.old ?? lbl.textContent;
   lbl.dataset.old = old;
-  const msg = lbl.textContent = TURN_ICONS[S.turn] + ' ' + TURN_NAMES[S.turn];
+  const msg = lbl.textContent = TURN_ICONS[S.turn] + ' ' + loc(S.turn);
   clearTimeout(turnMsgTimer);
   turnMsgTimer = setTimeout(() => {          // put the page name back, unless a new page already did
     if (lbl.textContent === msg) lbl.textContent = lbl.dataset.old;
@@ -698,9 +811,9 @@ function toggleFullscreen() {
 }
 function showFs() {
   const on = fsOn();
-  document.querySelectorAll('.fsBtn').forEach(b => { b.textContent = on ? '🗗' : '⛶'; b.title = on ? 'الخروج من ملء الشاشة (F)' : 'ملء الشاشة (F)'; });
+  document.querySelectorAll('.fsBtn').forEach(b => { b.textContent = on ? '🗗' : '⛶'; b.title = loc(on ? 'fsExit' : 'fs') + ' (F)'; });
   const lbl = $('fsMenu').nextElementSibling;
-  if (lbl) lbl.textContent = on ? 'خروج من ملء الشاشة' : 'ملء الشاشة';
+  if (lbl) lbl.textContent = loc(on ? 'fsExit' : 'fs');
 }
 if (!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen)) document.body.classList.add('noFs');
 document.querySelectorAll('.fsBtn').forEach(b => b.onclick = e => { e.stopPropagation(); toggleFullscreen(); });
@@ -749,14 +862,14 @@ function renderList() {
   const q = $('q').value.trim().toLowerCase();
   $('list').innerHTML = S.surahs.filter(s =>
     s.name.includes(q) || s.englishName.toLowerCase().includes(q) || String(s.number) === q
-  ).map(s => `<li data-n="${esc(s.number)}"><span>${esc(ar(s.number))}</span><span>${esc(s.name)}<br><small>${esc(s.englishName)} · ${esc(ar(s.numberOfAyahs))}</small></span></li>`).join('');
+  ).map(s => `<li data-n="${esc(s.number)}"><span>${esc(num(s.number))}</span><span>${esc(s.name)}<br><small>${esc(s.englishName)} · ${esc(num(s.numberOfAyahs))}</small></span></li>`).join('');
 }
 async function openList() {
   $('drawer').classList.add('open');
   setMenu(false);
   if (!S.surahs) {
     try { S.surahs = (await db()).surahs; renderList(); }
-    catch (e) { $('list').innerHTML = '<li>⚠️ تعذّر التحميل</li>'; }
+    catch (e) { $('list').innerHTML = '<li>' + esc(loc('listErr')) + '</li>'; }
   }
 }
 function closeList() { $('drawer').classList.remove('open'); }
@@ -768,13 +881,13 @@ $('list').onclick = async e => {
   closeList();
   try { loadPage(await surahPage(+li.dataset.n)); } catch (err) {}
 };
-$('trSel').onchange = () => { store.set('tr', $('trSel').value); if (S.sel >= 0) fill(S.sel); };
+$('trSel').onchange = () => { store.set('tr', $('trSel').value); applyLang(); if (S.sel >= 0) fill(S.sel); };
 $('rec').onchange = () => { store.set('rec', $('rec').value); };
 
 // ---------- Tajweed switch ----------
 function setTajweed(on) {
   document.body.classList.toggle('tj', on);
-  $('tjBtn').textContent = 'التجويد: ' + (on ? 'تشغيل' : 'إيقاف');
+  $('tjBtn').textContent = loc('tj') + loc(on ? 'on' : 'off');
   $('tjBtn').setAttribute('aria-pressed', on);
   $('lgBtn').style.display = on ? '' : 'none';
   $('legend').classList.toggle('show', on && $('legend').dataset.open === '1');
@@ -832,7 +945,7 @@ async function keepAwake() {
 function setAwake(on) {
   S.awake = on;
   store.set('awake', on ? '1' : '0');
-  $('awakeBtn').textContent = '☀ إبقاء الشاشة مضاءة: ' + (on ? 'تشغيل' : 'إيقاف');
+  $('awakeBtn').textContent = loc('awake') + loc(on ? 'on' : 'off');
   $('awakeBtn').setAttribute('aria-pressed', on);
   if (on) keepAwake();
   else if (wakeLock) { const l = wakeLock; wakeLock = null; l.release().catch(() => {}); }
@@ -841,15 +954,61 @@ $('awakeBtn').onclick = () => setAwake(!S.awake);
 document.addEventListener('visibilitychange', keepAwake);
 ['click', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, keepAwake, { passive: true }));
 
+// ---------- App language (see I18N at the top) ----------
+// Surah + ayah as shown in the menu, the tafsir sheet and the repeat panel.
+function refText(a) {
+  const latin = !rtlLang(), name = latin ? a.surah.englishName : a.surah.name;
+  if (a.surah.number === 1 && a.numberInSurah === 1) return `${name} · ${loc('bism')}`;
+  return latin ? `${name} ${a.surah.number}:${shownNo(a)}` : `${name} ﴿${num(shownNo(a))}﴾`;
+}
+// The line at the top of the menu: surah · juz · page.
+function setLbl() {
+  const first = S.ayahs[0];
+  if (!first) return;
+  const p = S.page, name = rtlLang() ? first.surah.name : first.surah.englishName;
+  $('lbl').textContent = `${name} · ${loc('juz')} ${num(first.juz)} · ${loc('pageW')} ${num(p)}${S.spread ? '–' + num(p + 1) : ''}`;
+}
+function applyLang() {
+  L = store.get('tr') ? (LANG_OF[$('trSel').value] || 'ar') : 'ar';
+  const dir = rtlLang() ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-t]').forEach(e => { e.textContent = loc(e.dataset.t); });
+  document.querySelectorAll('[data-tt]').forEach(e => { e.title = loc(e.dataset.tt); });
+  document.querySelectorAll('[data-tp]').forEach(e => { e.placeholder = loc(e.dataset.tp); });
+  document.querySelectorAll('[data-ta]').forEach(e => { e.setAttribute('aria-label', loc(e.dataset.ta)); });
+  document.title = loc('title');
+  // The panels read left to right in English, French and Turkish. The menu keeps its right-to-left order,
+  // because its ▶ / ◀ buttons follow the direction pages turn in the Mushaf.
+  ['sheet', 'repPanel', 'vp', 'drawer'].forEach(id => { $(id).dir = dir; $(id).lang = L; });
+  $('menu').lang = L; $('lbl').dir = dir;
+  [...$('rec').options].forEach(o => {
+    if (!o.dataset.ar) o.dataset.ar = o.textContent;
+    const n = RECITERS[o.value];
+    o.textContent = n && !rtlLang() ? n[L === 'tr' ? 1 : 0] : o.dataset.ar;
+  });
+  [...$('turnSel').options].forEach(o => { o.textContent = loc('turnPre') + loc(o.value); });
+  document.querySelectorAll('#repPresets button').forEach(b => { b.textContent = b.dataset.n === '1' ? loc('repNone') : num(b.dataset.n); });
+  setTajweed(document.body.classList.contains('tj'));
+  setAwake(S.awake);
+  showFs();
+  setTurn(S.turn);
+  showRep();
+  setLbl();
+  if (S.sel >= 0) $('ref').textContent = refText(S.ayahs[S.sel]);
+  if (S.surahs) renderList();
+}
+
 // ---------- Start ----------
 setAwake(S.awake);
 setTheme(store.get('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 setFont(fs);
-if (store.get('tr')) $('trSel').value = store.get('tr');
+// Nothing chosen yet = Arabic, with no translation (the app's language follows this list).
+$('trSel').value = store.get('tr') || 'none';
+if (!$('trSel').value) $('trSel').value = 'none';
 if (store.get('rec')) $('rec').value = store.get('rec');
 if (!$('rec').value) $('rec').selectedIndex = 0;
 setTajweed(store.get('tj') === '1');
 setTurn(store.get('turn'));
+applyLang();
 loadPage(parseInt(store.get('lastPage')) || 1, { noAnim: true });
 
 // ---------- Ask the assistant (typed box + voice share one endpoint) ----------
@@ -880,15 +1039,15 @@ function aiConsent() {
 }
 
 async function askServer(q, useAyah) {
-  if (!await aiConsent()) throw new Error('لم يُرسل السؤال.');
+  if (!await aiConsent()) throw new Error(loc('notSent'));
   const body = { question: q, state: { page: S.page, surah: S.ayahs[0] ? S.ayahs[0].surah.number : null } };
   if (useAyah && S.sel >= 0) { const a = S.ayahs[S.sel]; body.surah = a.surah.number; body.ayah = a.numberInSurah; }
   let r, d;
   try {
     r = await fetch(ASK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     d = await r.json();
-  } catch (e) { throw new Error('تعذّر الاتصال. تحقق من الإنترنت.'); }
-  if (!r.ok) throw new Error(d.error || 'حدث خطأ.');
+  } catch (e) { throw new Error(loc('connErr')); }
+  if (!r.ok) throw new Error(d.error || loc('err'));
   return d;
 }
 
@@ -902,14 +1061,14 @@ async function runAction(d) {
     case 'prev_page': await go(-1); break;
     case 'tajweed': setTajweed(!!d.value); await loadPage(S.page, { noAnim: true }); break;
     case 'reciter': $('rec').value = d.value; store.set('rec', d.value); break;
-    case 'translation': $('trSel').value = d.value; store.set('tr', d.value); if (S.sel >= 0) fill(S.sel); break;
+    case 'translation': $('trSel').value = d.value; store.set('tr', d.value); applyLang(); if (S.sel >= 0) fill(S.sel); break;
     case 'theme': setTheme(d.value); break;
     case 'font': setFont(fs + (d.value === 'up' ? 0.2 : -0.2)); break;
     case 'play': if (S.audio && S.audio.paused) togglePlay(); else if (!S.audio) playFrom(S.sel >= 0 ? S.sel : 0); break;
     case 'stop': stopAudio(); break;
     default: break;            // "answer": nothing to do on the page
   }
-  return say || 'تم.';
+  return say || loc('done');
 }
 
 async function askAI() {
@@ -921,7 +1080,7 @@ async function askAI() {
     const msg = await runAction(d);
     if (S.sel === i) $('ans').textContent = msg;
   } catch (e) {
-    if (S.sel === i) { $('ans').className = 'err'; $('ans').textContent = e.message || 'حدث خطأ.'; }
+    if (S.sel === i) { $('ans').className = 'err'; $('ans').textContent = e.message || loc('err'); }
   }
   $('ab').disabled = false;
 }
@@ -952,10 +1111,10 @@ async function handleVoice(text) {
     const d = await askServer(text, S.sel >= 0);
     const msg = await runAction(d);
     showVoice(text, msg); speak(msg);
-  } catch (e) { showVoice(text, e.message || 'تعذّر الاتصال.', true); }
+  } catch (e) { showVoice(text, e.message || loc('connErr'), true); }
 }
 function startVoice() {
-  if (!SR) return showVoice('', 'المتصفح لا يدعم الأوامر الصوتية. جرّب Chrome أو Edge.', true);
+  if (!SR) return showVoice('', loc('noSR'), true);
   if (listening) { try { recog.stop(); } catch (e) {} return; }
   if (S.audio && !S.audio.paused) { S.audio.pause(); $('play').textContent = '▶'; }   // so the recitation is not heard as speech
   if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -966,12 +1125,12 @@ function startVoice() {
   recog.onresult = e => { heard = Array.from(e.results).map(r => r[0].transcript).join(' ').trim(); $('vyou').textContent = heard; };
   recog.onerror = e => {
     heard = '';
-    const msg = e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'اسمح للمتصفح باستخدام الميكروفون.'
-      : e.error === 'no-speech' ? 'لم أسمع شيئًا. حاول مرة أخرى.' : 'تعذّر الاستماع. حاول مرة أخرى.';
+    const msg = e.error === 'not-allowed' || e.error === 'service-not-allowed' ? loc('micDenied')
+      : e.error === 'no-speech' ? loc('noSpeech') : loc('listenErr');
     showVoice('', msg, true);
   };
   recog.onend = () => { listening = false; setMic(false); if (heard) handleVoice(heard); };
-  try { recog.start(); } catch (e) { showVoice('', 'تعذّر تشغيل الميكروفون.', true); }
+  try { recog.start(); } catch (e) { showVoice('', loc('micErr'), true); }
 }
 document.querySelectorAll('.mic').forEach(b => b.onclick = e => { e.stopPropagation(); startVoice(); });
 $('vl').textContent = vlang === 'ar-SA' ? 'ع' : 'EN';
