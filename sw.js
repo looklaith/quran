@@ -1,4 +1,4 @@
-﻿const CACHE = 'mushafi-v35';
+﻿const CACHE = 'mushafi-v36';
 const TAJWEED = 'mushafi-tajweed';          // pages already opened with tajweed, kept across updates
 const FONTS = [
   'Amiri-400-arabic', 'Amiri-400-latin-ext', 'Amiri-400-latin',

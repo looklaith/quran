@@ -74,7 +74,8 @@ const I18N = {
   repOff: ['بدون تكرار (قراءة عادية).', 'No repeat (normal reading).', 'Pas de répétition (lecture normale).', 'کوئی تکرار نہیں (عام تلاوت)۔', 'Tekrar yok (normal okuma).'],
   repNow: [(r, n, m) => `${r} — التكرار ${n} من ${m}`, (r, n, m) => `${r} — repeat ${n} of ${m}`, (r, n, m) => `${r} — répétition ${n} sur ${m}`,
     (r, n, m) => `${r} — تکرار ${n} از ${m}`, (r, n, m) => `${r} — tekrar ${n} / ${m}`],
-  trNone: ['العربية (بدون ترجمة)', 'Arabic (no translation)', 'Arabe (sans traduction)', 'عربی (بغیر ترجمہ)', 'Arapça (çevirisiz)'],
+  // Every language in the list is written in its own letters, so Arabic is always العربية.
+  trNone: ['العربية (بدون ترجمة)', 'العربية', 'العربية', 'العربية', 'العربية'],
   turnPre: ['تقليب الصفحات: ', 'Page turn: ', 'Tourner les pages : ', 'صفحہ پلٹنا: ', 'Sayfa çevirme: '],
   flip: ['قلب الصفحة', 'Page flip', 'Feuilleter', 'صفحہ پلٹیں', 'Sayfa çevir'],
   slide: ['سحب يمين / يسار', 'Slide left / right', 'Glisser gauche / droite', 'دائیں / بائیں کھسکائیں', 'Sağa / sola kaydır'],
