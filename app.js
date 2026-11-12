@@ -548,10 +548,12 @@ function kashida(line, room) {
   // Insert from the end of each text node backwards so earlier positions stay valid; keep the
   // original text so a re-fit (rotating the phone) starts from clean text.
   const orig = new Map(spots.map(([n]) => [n, n.data]));
-  let need = Math.floor(room * 0.9 / kw);
+  // Only a gentle stretch, like the printed Mushaf: at most 2 kashidas in a word and at most half of
+  // the empty room; the rest goes to the spaces between words. (Filling all of it on a short line with
+  // few words, e.g. page 536 lines 14-15, made every word look pulled far too long.)
+  let need = Math.min(Math.floor(room * 0.5 / kw), spots.length * 2);
   for (let tries = 0; tries < 10 && need >= 1; tries++) {
-    // Spread evenly over the words: normally at most 4 per word, more on a line with few words.
-    const cap = Math.max(4, Math.ceil(need / spots.length));
+    const cap = 2;
     const count = spots.map((_, i) => Math.min(cap, Math.floor(need * (i + 1) / spots.length) - Math.floor(need * i / spots.length)));
     for (let i = spots.length - 1; i >= 0; i--) {
       const [n, at] = spots[i];
