@@ -782,35 +782,21 @@ function ayahUrl(i) {
     ? `https://everyayah.com/data/${opt.dataset.ea}/${pad(a.surah.number)}${pad(a.numberInSurah)}.mp3`
     : `https://cdn.islamic.network/quran/audio/${opt.dataset.br || '128'}/${opt.value}/${a.number}.mp3`;
 }
-// While one ayah plays, the next one is already downloaded, so the recitation goes on without a
-// pause between ayahs. everyayah.com allows fetching the file whole (kept as a blob: address);
-// for other servers an Audio element starts buffering it.
-S.pre = null;
-function dropPre() {
-  const p = S.pre; S.pre = null;
-  if (!p) return;
-  if (p.src.startsWith('blob:')) URL.revokeObjectURL(p.src);
-  if (p.el) p.el.removeAttribute('src');
-}
+// While one ayah plays, the next file is downloaded into the browser's cache, so it starts sooner.
+// Only the cache is warmed: every ayah still plays from its normal address in a new Audio, the way
+// iPhones allow (playing a blob: copy or a pre-made Audio element stopped after one ayah on iPhone).
+S.pre = '';
 function preloadNext(i) {
   const j = i + 1;
   if (j >= S.ayahs.length) return;
   const url = ayahUrl(j);
-  if (S.pre && S.pre.url === url) return;
-  dropPre();
-  const pre = { url, src: url, el: null };
-  S.pre = pre;
-  if (url.startsWith('https://everyayah.com/')) {
-    fetch(url).then(r => r.ok ? r.blob() : Promise.reject(r.status))
-      .then(b => { if (S.pre === pre) pre.src = URL.createObjectURL(b); }).catch(() => {});
-  } else {
-    const el = new Audio(); el.preload = 'auto'; el.src = url; pre.el = el;
-    try { el.load(); } catch (e) {}
-  }
+  if (S.pre === url) return;
+  S.pre = url;
+  try { fetch(url, { mode: 'no-cors' }).catch(() => {}); } catch (e) {}
 }
 function stopAudio() {
   const a = S.audio; S.audio = null;
-  if (a) { a.onended = a.onerror = null; a.pause(); a.removeAttribute('src'); a.load(); if (a._blob) URL.revokeObjectURL(a._blob); }
+  if (a) { a.onended = a.onerror = null; a.pause(); a.removeAttribute('src'); a.load(); }
   $('play').textContent = '▶';
   $('book').querySelectorAll('.ayah.cur').forEach(e => e.classList.remove('cur'));
   S.playing = null;
@@ -819,13 +805,7 @@ function stopAudio() {
 function playFrom(i, n = 1) {
   stopAudio();
   if (i >= S.ayahs.length) { const nx = S.page + (S.spread ? 2 : 1); if (nx <= 604) loadPage(nx, { play: true }); return; }
-  const url = ayahUrl(i);
-  let au;
-  if (S.pre && S.pre.url === url) {           // the next ayah was downloaded while the last one played
-    const p = S.pre; S.pre = null;
-    au = p.el || new Audio(p.src);
-    if (!p.el && p.src.startsWith('blob:')) au._blob = p.src;
-  } else au = new Audio(url);
+  const au = new Audio(ayahUrl(i));
   S.audio = au;
   $('play').textContent = '⏸';
   const parts = $('book').querySelectorAll(`.ayah[data-i="${i}"]`);
