@@ -117,13 +117,21 @@ const I18N = {
     'براؤزر کو مائیکروفون استعمال کرنے کی اجازت دیں۔', 'Tarayıcının mikrofonu kullanmasına izin verin.'],
   noSpeech: ['لم أسمع شيئًا. حاول مرة أخرى.', 'I did not hear anything. Try again.', 'Je n’ai rien entendu. Réessayez.', 'کچھ سنائی نہیں دیا۔ دوبارہ کوشش کریں۔', 'Bir şey duyamadım. Tekrar deneyin.'],
   listenErr: ['تعذّر الاستماع. حاول مرة أخرى.', 'Could not listen. Try again.', 'Écoute impossible. Réessayez.', 'سن نہیں سکا۔ دوبارہ کوشش کریں۔', 'Dinlenemedi. Tekrar deneyin.'],
-  micErr: ['تعذّر تشغيل الميكروفون.', 'Could not start the microphone.', 'Impossible de démarrer le micro.', 'مائیکروفون شروع نہیں ہو سکا۔', 'Mikrofon başlatılamadı.']
+  micErr: ['تعذّر تشغيل الميكروفون.', 'Could not start the microphone.', 'Impossible de démarrer le micro.', 'مائیکروفون شروع نہیں ہو سکا۔', 'Mikrofon başlatılamadı.'],
+  bmT: ['علامة الصفحة', 'Bookmark', 'Marque-page', 'بک مارک', 'Yer imi'],
+  bmSaved: [n => `🔖 حُفظت العلامة على الصفحة ${n}`, n => `🔖 Bookmark saved on page ${n}`, n => `🔖 Marque-page enregistré : page ${n}`,
+    n => `🔖 صفحہ ${n} پر بک مارک محفوظ ہو گیا`, n => `🔖 Yer imi ${n}. sayfaya kaydedildi`],
+  bmIs: [n => `🔖 العلامة على الصفحة ${n}`, n => `🔖 Bookmark: page ${n}`, n => `🔖 Marque-page : page ${n}`, n => `🔖 بک مارک: صفحہ ${n}`, n => `🔖 Yer imi: sayfa ${n}`],
+  bmGo: [n => `اذهب إلى الصفحة ${n}`, n => `Go to page ${n}`, n => `Aller à la page ${n}`, n => `صفحہ ${n} پر جائیں`, n => `${n}. sayfaya git`],
+  bmHere: ['احفظ هذه الصفحة بدلاً منها', 'Save this page instead', 'Enregistrer cette page à la place', 'اس کے بجائے یہ صفحہ محفوظ کریں', 'Bunun yerine bu sayfayı kaydet'],
+  bmDel: ['احذف العلامة', 'Remove bookmark', 'Supprimer le marque-page', 'بک مارک ہٹائیں', 'Yer imini kaldır']
 };
 // Reciter names in Latin letters for English, French and Turkish (Arabic and Urdu keep the Arabic names).
 const RECITERS = {
   'ar.alafasy': ['Mishary Alafasy', 'Mişari el-Afasi'], 'ar.husary': ['Mahmoud Al-Husary', 'Mahmud el-Husari'],
   'ar.minshawi': ['Al-Minshawi', 'el-Minşavi'], 'ar.abdulbasitmurattal': ['Abdul Basit', 'Abdulbasit Abdussamed'],
-  'ar.abdurrahmaansudais': ['As-Sudais', 'es-Sudeys'], 'ar.aymansowaid': ['Ayman Suwaid', 'Eymen Süveyd']
+  'ar.abdurrahmaansudais': ['As-Sudais', 'es-Sudeys'], 'ar.aymansowaid': ['Ayman Suwaid', 'Eymen Süveyd'],
+  'ar.mahermuaiqly': ['Maher Al-Muaiqly', 'Mahir el-Muaykılî']
 };
 const loc = (k, ...a) => { const e = I18N[k]; if (!e) return k; const v = e[LANGS.indexOf(L)] ?? e[0]; return typeof v === 'function' ? v(...a) : v; };
 const rtlLang = () => L === 'ar' || L === 'ur';
@@ -272,6 +280,7 @@ async function loadPage(p, opts = {}) {
   let off = 0;
   book.innerHTML = data.map(d => { const h = pageHTML(d, off); off += d.ayahs.length; return h; }).join('');
   fitPage();
+  showBm();
   // Scrolling back up lands at the bottom of the previous page (matters only when a page scrolls).
   $('reader').scrollTop = S.turn === 'scroll' && dir === 'prev' && !opts.noAnim ? 1e6 : 0;
   if (animate) {
@@ -384,7 +393,8 @@ function pageHTML({ p, ayahs, lines, surahs, tj }, off) {
 // whole spread fills the screen height. A+ / A− make it larger or smaller from there.
 const BASE_FS = 1.9;
 const LINE_EM = 19.5;          // a full printed Mushaf line is about 19.5 em wide in the Hafs font
-function fitPage(shrink) {
+function fitPage(shrink) { fitText(shrink); placeBtns(); }
+function fitText(shrink) {
   shrink = typeof shrink === 'number' ? shrink : 1;   // < 1 only on the safety re-run below
   const book = $('book'), reader = $('reader');
   const side = innerWidth > innerHeight;               // a phone held sideways (landscape)
@@ -499,13 +509,106 @@ function fitPage(shrink) {
   // Safety: a printed line must never stick out of its page (on Android that made the page slide
   // left and right). If one does, fit again a little smaller.
   const worst = Math.max(...parts.map(x => Math.max(...x.ls.map(l => l.scrollWidth / Math.max(1, x.box.clientWidth)))));
-  if (worst > 1.005 && shrink > 0.7) fitPage(shrink * 0.99 / worst);
-  // Phone upright: put the ☰ circle in the middle of the header row (between the surah and juz boxes),
-  // so it never covers the first line of the page.
-  const fb = $("fontBtns"), ph = upright && parts[0].pg.querySelector(".phead");
-  if (ph) { const r = ph.getBoundingClientRect(); fb.style.top = Math.max(2, r.top + r.height / 2 - 21) + "px"; }
-  else fb.style.top = "";
+  if (worst > 1.005 && shrink > 0.7) fitText(shrink * 0.99 / worst);
 }
+// The buttons around the page, all in the header row so none of them covers the words:
+// the green ☰ (with A+ / A−) in the middle, 🔖 at the top-left corner, 📜 🎨 at the top-right corner.
+// Each header row gets padding so its surah / juz boxes stay clear of them. `pos` = only move them
+// (when the page scrolls): the corner buttons go with the header; the ☰ always stays reachable.
+function placeBtns(pos) {
+  const pages = bookPages().filter(p => p.querySelector('.phead'));
+  const fb = $('fontBtns'), sb = $('sideBar'), bm = $('bmBtn'), fsb = $('fsTop');
+  if (!pages.length) { sb.style.top = bm.style.top = '-100px'; return; }
+  // If the header row is too narrow for them (a phone held upright, or one page whose surah / juz names
+  // would be cut), 🔖 and 📜 🎨 sit in the footer row instead, left and right of the page number.
+  const fsOn = getComputedStyle(fsb).display !== 'none', gap = 6, inset = 2;
+  const heads = pages.map(p => p.querySelector('.phead'));
+  if (!pos) {
+    heads.forEach(h => { h.style.paddingLeft = h.style.paddingRight = h.style.columnGap = ''; });
+    const lw = bm.offsetWidth + (fsOn ? fsb.offsetWidth + gap : 0) + 8, rw = sb.offsetWidth + 8;
+    if (pages.length > 1) {                      // open book: corners in the header, the ☰ group over the spine
+      const half = Math.ceil(fb.offsetWidth / 2) + 4 + 'px';
+      heads[1].style.paddingLeft = lw + 'px'; heads[0].style.paddingRight = rw + 'px';
+      heads[0].style.paddingLeft = half; heads[1].style.paddingRight = half;
+      S.btnFoot = false;
+    } else {                                     // one page: the ☰ group sits between the boxes, in the middle
+      // Fits = no name is cut, the boxes stay inside the row, and none of them touches the ☰ group.
+      const h = heads[0], fits = () => {
+        const f = fb.getBoundingClientRect(), hb = h.getBoundingClientRect();
+        const pl = parseFloat(getComputedStyle(h).paddingLeft), pr = parseFloat(getComputedStyle(h).paddingRight);
+        return [...h.children].every(s => {
+          const r = s.getBoundingClientRect();
+          return s.scrollWidth <= s.clientWidth + 1 && r.left >= hb.left + pl - 1 && r.right <= hb.right - pr + 1 && (r.right <= f.left + 2 || r.left >= f.right - 2);
+        });
+      };
+      h.style.columnGap = fb.offsetWidth + 16 + 'px';
+      h.style.paddingLeft = h.style.paddingRight = Math.max(lw, rw) + 'px';
+      S.btnFoot = innerWidth < 600 && innerWidth <= innerHeight || !fits();
+      if (S.btnFoot) { h.style.paddingLeft = h.style.paddingRight = ''; if (!fits()) h.style.columnGap = ''; }
+    }
+  }
+  const row = S.btnFoot ? '.pfoot' : '.phead';
+  const rh = pages[0].querySelector(row), lh = pages[pages.length - 1].querySelector(row);
+  const rr = rh.getBoundingClientRect(), lr = lh.getBoundingClientRect();
+  const hr = pages[0].querySelector('.phead').getBoundingClientRect();
+  const midR = rr.top + rr.height / 2, midL = lr.top + lr.height / 2;
+  sb.style.top = midR - sb.offsetHeight / 2 + 'px';
+  sb.style.left = rr.right - inset - sb.offsetWidth + 'px';
+  bm.style.top = midL - bm.offsetHeight / 2 + 'px';
+  bm.style.left = lr.left + inset + 'px';
+  if (fsOn) { fsb.style.top = midL - fsb.offsetHeight / 2 + 'px'; fsb.style.left = lr.left + inset + bm.offsetWidth + gap + 'px'; }
+  fb.style.top = Math.max(2, hr.top + hr.height / 2 - fb.offsetHeight / 2) + 'px';
+  if (!$('bmBox').hidden) closeBm();
+}
+$('reader').addEventListener('scroll', () => placeBtns(true), { passive: true });
+
+// ---------- Bookmark (🔖, top left) ----------
+// One saved page. Tap 🔖: no bookmark yet → save this page; on the saved page → remove it;
+// on another page → go back to the saved page, or save this page instead.
+const bmGet = () => parseInt(store.get('bm')) || 0;
+const shownPages = () => S.spread ? [S.page, S.page + 1] : [S.page];
+function showBm() {
+  const b = bmGet(), here = shownPages();
+  $('bmBtn').classList.toggle('on', here.includes(b));
+  bookPages().forEach((pg, i) => pg.classList.toggle('bmk', here[i] === b));
+}
+function closeBm() { clearTimeout(S.bmTimer); $('bmBox').hidden = true; }
+function bmBox(text, btns) {
+  const box = $('bmBox');
+  clearTimeout(S.bmTimer);
+  box.replaceChildren();
+  const msg = document.createElement('div'); msg.textContent = text; box.appendChild(msg);
+  btns.forEach(([label, fn, cls]) => {
+    const b = document.createElement('button'); b.textContent = label;
+    if (cls) b.className = cls;
+    b.onclick = e => { e.stopPropagation(); fn(); };
+    box.appendChild(b);
+  });
+  box.dir = rtlLang() ? 'rtl' : 'ltr'; box.lang = L;
+  box.hidden = false;
+  const r = $('bmBtn').getBoundingClientRect();
+  // Below the 🔖 button, or above it when the button is at the bottom of the page (phone upright).
+  box.style.top = (r.bottom + 8 + box.offsetHeight > innerHeight ? Math.max(8, r.top - 8 - box.offsetHeight) : r.bottom + 8) + 'px';
+  box.style.left = Math.max(8, Math.min(r.left, innerWidth - box.offsetWidth - 8)) + 'px';
+}
+function bmSave() {
+  store.set('bm', S.page); showBm();
+  bmBox(loc('bmSaved', num(S.page)), []);
+  S.bmTimer = setTimeout(closeBm, 2000);
+}
+$('bmBtn').onclick = e => {
+  e.stopPropagation(); setMenu(false); closeList();
+  if (!$('bmBox').hidden) return closeBm();
+  const b = bmGet();
+  if (!b) return bmSave();
+  if (shownPages().includes(b)) return bmBox(loc('bmIs', num(b)), [[loc('bmDel'), () => { store.set('bm', ''); showBm(); closeBm(); }], [loc('close'), closeBm]]);
+  bmBox(loc('bmIs', num(b)), [[loc('bmGo', num(b)), () => { closeBm(); loadPage(b); }, 'go'], [loc('bmHere'), bmSave], [loc('close'), closeBm]]);
+};
+$('bmBox').onclick = e => e.stopPropagation();
+document.addEventListener('click', e => { if (!$('bmBox').hidden && !e.target.closest('#bmBox,#bmBtn')) closeBm(); });
+// ---------- Top-right toolbar: surah list and tajweed ----------
+$('sbList').onclick = e => { e.stopPropagation(); closeBm(); setMenu(false); openList(); };
+$('sbTj').onclick = e => { e.stopPropagation(); closeBm(); $('tjBtn').onclick(); };
 // Letters that join to the next letter, combining marks, and letters that can be joined to.
 const KD_JOIN = 'بتثجحخسشصضطظعغفقكلمنهيئیـ', KD_MARK = /[ً-ٰٟۖ-ۭ]/,
       KD_NEXT = /[آ-يٱ-ۓ]/;
@@ -892,6 +995,9 @@ function setTajweed(on) {
   document.body.classList.toggle('tj', on);
   $('tjBtn').textContent = loc('tj') + loc(on ? 'on' : 'off');
   $('tjBtn').setAttribute('aria-pressed', on);
+  $('sbTj').classList.toggle('on', on);
+  $('sbTj').title = loc('tj') + loc(on ? 'on' : 'off');
+  $('sbTj').setAttribute('aria-pressed', on);
   $('lgBtn').style.display = on ? '' : 'none';
   $('legend').classList.toggle('show', on && $('legend').dataset.open === '1');
   store.set('tj', on ? '1' : '0');

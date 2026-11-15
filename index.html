@@ -32,9 +32,22 @@ button:hover{border-color:var(--accent)}
 #book.spread{gap:6px;padding:0 8px}
 #book.spread .page:first-child{--spine:inset 22px 0 26px -20px rgba(0,0,0,.38)}
 #book.spread .page:last-child{--spine:inset -22px 0 26px -20px rgba(0,0,0,.38)}
-/* The A− ☰ A+ buttons sit over the spine, so keep each page's inner header box clear of them. */
-#book.spread .page:first-child .phead{padding-left:62px}
-#book.spread .page:last-child .phead{padding-right:62px}
+/* The A− ☰ A+ buttons sit over the spine, and the corner buttons (🔖 top left, 📜 🎨 top right) sit in the
+   header row: app.js (placeBtns) gives each header row enough padding so its boxes stay clear of them. */
+.cornerBtn{width:36px;height:36px;padding:0;border-radius:50%;font-size:1.05rem;line-height:1;display:inline-flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+#bmBtn,#sideBar{position:fixed;z-index:25;top:-100px;left:0}
+#sideBar{display:flex;gap:6px}
+#bmBtn.on,#sbTj.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+@media (orientation:portrait) and (max-width:599px){.cornerBtn{width:30px;height:30px;font-size:.88rem}#sideBar{gap:4px}}
+/* A saved page gets a small red ribbon hanging from the top of its frame. */
+.page.bmk::before{content:'';position:absolute;top:-9px;left:28%;width:12px;height:22px;background:#b3312c;z-index:1;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 72%,0 100%)}
+#bmBox{position:fixed;z-index:30;display:flex;flex-direction:column;gap:8px;width:max-content;max-width:min(300px,calc(100vw - 16px));
+  background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:12px;box-shadow:0 10px 32px rgba(0,0,0,.3);font:.95rem/1.5 system-ui,sans-serif}
+#bmBox[hidden]{display:none}
+#bmBox button{padding:8px 14px}
+#bmBox .go{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 /* Turning a page of the open book: a leaf lifts at the spine and turns over to the other side. */
 #flip{position:fixed;inset:0;z-index:15;pointer-events:none;perspective:2400px}
 #flip>div{position:absolute}
@@ -102,7 +115,7 @@ button{border-radius:999px}
 #fontBtns button{width:40px;height:40px;padding:0;border-radius:50%;font:bold 1rem/1 sans-serif;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2)}
 /* The big circle in the middle: tap it and all the buttons come down. */
 /* Full screen (laptop / desktop): a circle in the top corner, outside the book, and one in the menu. */
-#fsTop{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;z-index:25;width:44px;height:44px;padding:0;border-radius:50%;font-size:1.3rem;line-height:1;
+#fsTop{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;z-index:25;width:36px;height:36px;padding:0;border-radius:50%;font-size:1.1rem;line-height:1;
   background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2);display:none}
 @media (hover:hover) and (pointer:fine){#fsTop{display:inline-flex;align-items:center;justify-content:center}}
 body.noFs #fsTop,body.noFs .fsItem{display:none!important}
@@ -217,6 +230,10 @@ body.tj #legend.show{display:block}
 
 <div id="fontBtns"><button id="fPlus" data-tt="bigger" title="تكبير الخط">A+</button><button id="menuBtn" data-tt="menu" title="القائمة" aria-expanded="false" aria-controls="menu">☰</button><button id="fMinus" data-tt="smaller" title="تصغير الخط">A−</button></div>
 <button id="fsTop" class="fsBtn" title="ملء الشاشة (F)">⛶</button>
+<!-- Top left: the bookmark. Top right: a small toolbar with the surah list and the tajweed switch. -->
+<button id="bmBtn" class="cornerBtn" data-tt="bmT" title="علامة الصفحة">🔖</button>
+<div id="sideBar"><button id="sbList" class="cornerBtn" data-tt="surahs" title="السور">📜</button><button id="sbTj" class="cornerBtn" title="التجويد">🎨</button></div>
+<div id="bmBox" role="dialog" hidden></div>
 
 <!-- All the buttons live in this round menu; the big circle at the top opens and closes it. -->
 <nav id="menu" data-ta="menu" aria-label="القائمة">
@@ -294,6 +311,7 @@ body.tj #legend.show{display:block}
       <option value="ar.abdulbasitmurattal" data-br="64">عبد الباسط</option>
       <option value="ar.abdurrahmaansudais" data-br="64">السديس</option>
       <option value="ar.aymansowaid" data-ea="Ayman_Sowaid_64kbps">أيمن سويد</option>
+      <option value="ar.mahermuaiqly" data-br="128">ماهر المعيقلي</option>
     </select>
     <select id="turnSel" data-tt="turnT" title="طريقة تقليب الصفحات">
       <option value="flip">تقليب الصفحات: قلب الصفحة</option>
