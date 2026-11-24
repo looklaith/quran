@@ -283,6 +283,7 @@ async function loadPage(p, opts = {}) {
   showBm();
   // Scrolling back up lands at the bottom of the previous page (matters only when a page scrolls).
   $('reader').scrollTop = S.turn === 'scroll' && dir === 'prev' && !opts.noAnim ? 1e6 : 0;
+  $('reader').scrollLeft = 0;            // zoomed upright page: start again at the right edge (start of the lines)
   if (animate) {
     if (S.turn === 'flip' && spread) { if (old && old.length === 2) bookFlip(old, dir); }
     else if (S.turn === 'flip') {
@@ -413,6 +414,7 @@ function fitText(shrink) {
     return w;
   };
   parts.forEach(x => { x.box.style.fontSize = ''; x.pg.style.maxWidth = ''; x.box.classList.remove('flow'); });
+  book.style.width = ''; reader.classList.remove('zoomed');   // measure the page at its normal size
   book.style.minHeight = '0';
   let widthSize = Infinity, fitW = Infinity, frameW = 0;
   for (const x of parts) {
@@ -509,7 +511,33 @@ function fitText(shrink) {
   // Safety: a printed line must never stick out of its page (on Android that made the page slide
   // left and right). If one does, fit again a little smaller.
   const worst = Math.max(...parts.map(x => Math.max(...x.ls.map(l => l.scrollWidth / Math.max(1, x.box.clientWidth)))));
-  if (worst > 1.005 && shrink > 0.7) fitText(shrink * 0.99 / worst);
+  if (worst > 1.005 && shrink > 0.7) { fitText(shrink * 0.99 / worst); return; }
+  // Phone upright + A+: the same printed page, only bigger (like pinching to zoom). The lines keep the
+  // printed layout; the page is slid left / right and up / down to read it.
+  // Text and page width grow by the same amount, so every line breaks exactly where it did.
+  if (upright && upZoom > 1) {
+    const x = parts[0], frame = x.pg.offsetWidth - x.box.clientWidth;
+    const textW = x.box.clientWidth, size = parseFloat(x.box.style.fontSize);
+    x.pg.style.maxWidth = '';
+    book.style.width = Math.round(textW * upZoom + frame) + 'px';
+    setSize(size * upZoom);
+    reader.classList.add('zoomed');
+  }
+}
+// A+ / A− on a phone held upright: zoom of the whole fitted page (1 = the normal page on the screen).
+const isUpright = () => !S.spread && innerWidth <= innerHeight && innerWidth < 600;
+var upZoom = Math.max(1, Math.min(3, parseFloat(store.get('upZoom')) || 1));
+function setUpZoom(v) {
+  const r = $('reader'), old = upZoom;
+  upZoom = Math.max(1, Math.min(3, Math.round(v * 4) / 4));
+  store.set('upZoom', upZoom);
+  // keep the same spot of the page in the middle of the screen
+  const cx = r.scrollLeft + r.clientWidth / 2, cy = r.scrollTop + r.clientHeight / 2;
+  fitPage();
+  const k = upZoom / old;
+  r.scrollLeft = cx * k - r.clientWidth / 2;
+  r.scrollTop = cy * k - r.clientHeight / 2;
+  placeBtns(true);
 }
 // The buttons around the page, all in the header row so none of them covers the words:
 // the green ☰ (with A+ / A−) in the middle, 🔖 at the top-left corner, 📜 🎨 at the top-right corner.
@@ -545,6 +573,8 @@ function placeBtns(pos) {
       h.style.paddingLeft = h.style.paddingRight = Math.max(lw, rw) + 'px';
       S.btnFoot = innerWidth < 600 && innerWidth <= innerHeight || !fits();
       if (S.btnFoot) { h.style.paddingLeft = h.style.paddingRight = ''; if (!fits()) h.style.columnGap = ''; }
+      // a zoomed page slides under the ☰, so its header needs no gap for it (the gap would cut the names)
+      if ($('reader').classList.contains('zoomed')) h.style.columnGap = '';
     }
   }
   const row = S.btnFoot ? '.pfoot' : '.phead';
@@ -558,6 +588,21 @@ function placeBtns(pos) {
   bm.style.left = lr.left + inset + 'px';
   if (fsOn) { fsb.style.top = midL - fsb.offsetHeight / 2 + 'px'; fsb.style.left = lr.left + inset + bm.offsetWidth + gap + 'px'; }
   fb.style.top = Math.max(2, hr.top + hr.height / 2 - fb.offsetHeight / 2) + 'px';
+  // upright phone: A− / A+ beside the page number, fixed to the screen (they do not slide with a zoomed page)
+  const uf = $('upFont'), up = isUpright() && pages.length === 1;
+  uf.classList.toggle('on', up);
+  if (up && !pos) {
+    const rd = $('reader').getBoundingClientRect(), pn = pages[0].querySelector('.hPage');
+    const zoomed = $('reader').classList.contains('zoomed'), gap = 8, bw = 34;
+    const half = pn.offsetWidth / 2;
+    const cx = rd.left + rd.width / 2, foot = pages[0].querySelector('.pfoot').getBoundingClientRect();
+    // zoomed: the footer is off the screen, so they keep the place they had on the normal page
+    if (!zoomed || !S.upY) S.upY = Math.min(foot.top + foot.height / 2, innerHeight - 26);
+    const top = S.upY - bw / 2 + 'px';
+    $('uPlus').style.top = $('uMinus').style.top = top;
+    $('uPlus').style.left = cx + half + gap + 'px';
+    $('uMinus').style.left = cx - half - gap - bw + 'px';
+  }
   if (!$('bmBox').hidden) closeBm();
 }
 $('reader').addEventListener('scroll', () => placeBtns(true), { passive: true });
@@ -950,9 +995,9 @@ document.addEventListener('keydown', e => {
     if ((e.key === 'ArrowUp' || e.key === 'PageUp') && atTop()) go(-1);
   }
 });
-let tx = 0, ty = 0, startBottom = false, startTop = false;   // swipe right = next page (Arabic reads right to left)
+let tx = 0, ty = 0, sx0 = 0, startBottom = false, startTop = false;   // swipe right = next page (Arabic reads right to left)
 $('reader').addEventListener('touchstart', e => {
-  tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  tx = e.touches[0].clientX; ty = e.touches[0].clientY; sx0 = $('reader').scrollLeft;
   startBottom = atBottom(); startTop = atTop();
 }, { passive: true });
 $('reader').addEventListener('touchend', e => {
@@ -964,6 +1009,8 @@ $('reader').addEventListener('touchend', e => {
     }
     return;
   }
+  // A zoomed page slides left / right first; the page turns only when it is already at its edge.
+  if ($('reader').classList.contains('zoomed') && Math.abs($('reader').scrollLeft - sx0) > 2) return;
   if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy)) go(dx > 0 ? 1 : -1);
 }, { passive: true });
 // Mouse wheel / touchpad on a laptop, scroll mode only. A short pause after each turn so one
@@ -1049,6 +1096,9 @@ function setFont(v) {
 // Each tap changes the size by about 10%, so it is easy to see.
 $('fMinus').onclick = e => { e.stopPropagation(); setFont(fs - 0.2); };
 $('fPlus').onclick = e => { e.stopPropagation(); setFont(fs + 0.2); };
+// upright phone: zoom the whole page
+$('uMinus').onclick = e => { e.stopPropagation(); setUpZoom(upZoom - 0.25); };
+$('uPlus').onclick = e => { e.stopPropagation(); setUpZoom(upZoom + 0.25); };
 
 // ---------- Keep the screen on while reading ----------
 // The phone would turn its screen off after a short time without touches, in the middle of reading.

@@ -107,8 +107,15 @@ button{border-radius:999px}
 .badge{position:absolute;top:-4px;left:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--bg);font:bold .7rem/18px sans-serif}
 /* A+ and A− are always on screen: two circles fixed at the top (below the bar when it is open). */
 #fontBtns{position:fixed;top:calc(6px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px}
-/* A phone held upright always shows the whole printed page, exactly fitted: no A+ / A− there. */
+/* A phone held upright: A+ / A− zoom the whole printed page (app.js sets #book zoom); it then slides
+   left / right as well as up / down. */
+#reader.zoomed{overflow-x:auto}
+#reader.zoomed #book{flex:none}
+/* Upright, the header row has no room for them, so they sit at the bottom, beside the page number
+   (#upFont, placed by placeBtns), and stay on the screen while the page is zoomed. */
 @media (orientation:portrait) and (max-width:599px){#fPlus,#fMinus{display:none}}
+#upFont button{position:fixed;z-index:25;width:34px;height:34px;padding:0;border-radius:50%;font:bold .85rem/1 sans-serif;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 2px 8px rgba(0,0,0,.2);display:none}
+#upFont.on button{display:block}
 /* Phone upright (also the iPhone app): the page starts below the clock / notch, and a smaller ☰ sits in the
    empty space between the two header boxes (app.js moves it there), so it never covers the first line. */
 @media (orientation:portrait) and (max-width:599px){body #reader{padding-top:calc(4px + env(safe-area-inset-top))}body #fontBtns #menuBtn{width:42px;height:42px;font-size:1.2rem;border-width:2px}}
@@ -229,6 +236,7 @@ body.tj #legend.show{display:block}
 <div id="flip"></div>
 
 <div id="fontBtns"><button id="fPlus" data-tt="bigger" title="تكبير الخط">A+</button><button id="menuBtn" data-tt="menu" title="القائمة" aria-expanded="false" aria-controls="menu">☰</button><button id="fMinus" data-tt="smaller" title="تصغير الخط">A−</button></div>
+<div id="upFont"><button id="uPlus" data-tt="bigger" title="تكبير الخط">A+</button><button id="uMinus" data-tt="smaller" title="تصغير الخط">A−</button></div>
 <button id="fsTop" class="fsBtn" title="ملء الشاشة (F)">⛶</button>
 <!-- Top left: the bookmark. Top right: a small toolbar with the surah list and the tajweed switch. -->
 <button id="bmBtn" class="cornerBtn" data-tt="bmT" title="علامة الصفحة">🔖</button>
