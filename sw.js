@@ -1,4 +1,4 @@
-const CACHE = 'mushafi-v41';
+const CACHE = 'mushafi-v42';
 const TAJWEED = 'mushafi-tajweed';          // pages already opened with tajweed, kept across updates
 const FONTS = [
   'Amiri-400-arabic', 'Amiri-400-latin-ext', 'Amiri-400-latin',
@@ -37,7 +37,8 @@ self.addEventListener('fetch', e => {
     return;
   }
   // Audio and other sites go straight to the network. So does the assistant (/api/).
-  if (url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
+  // Visit counting (/_vercel/) is never saved either.
+  if (url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/_vercel/')) return;
 
   // Quran data and fonts never change within a version: saved copy first (instant, works offline).
   if (url.pathname.startsWith('/data/') || url.pathname.startsWith('/fonts/')) {

@@ -1333,6 +1333,14 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     });
   }));
 }
+// Anonymous visit counting (Vercel Web Analytics: no cookies, no names, no tracking across sites).
+// Only on the live website (and the Android app, which opens it) — never in the iPhone app's offline copy.
+if (/(^|\.)laithissa\.online$/.test(location.hostname)) {
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  const va = document.createElement('script');
+  va.defer = true; va.src = '/_vercel/insights/script.js';
+  document.head.appendChild(va);
+}
 // Keep the chosen translation on the phone too (the Quran text and tafsir are saved when the app installs).
 $('trSel').addEventListener('change', () => edition($('trSel').value).catch(() => {}));
 if ($('trSel').value !== 'none') edition($('trSel').value).catch(() => {});
